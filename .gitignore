@@ -1,0 +1,17 @@
+# Only Python source is tracked; no markdown or generated artifacts
+*.md
+*.ipynb
+*.yaml
+*.yml
+*.csv
+*.json
+*.ckpt
+*.npy
+*.sh
+__pycache__/
+*.py[cod]
+.venv/
+outputs/
+embeddings/
+checkpoints/
+pseudo_reports*/
