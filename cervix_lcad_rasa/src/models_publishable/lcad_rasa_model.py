@@ -26,12 +26,20 @@ class PublishableLCADRASA(nn.Module):
         max_len: int = 128,
         use_risk_head: bool = True,
         use_section_align: bool = True,
+        use_oct: bool = True,
+        use_colposcopy: bool = True,
+        use_instruction: bool = True,
+        use_fused_visual: bool = True,
         dropout: float = 0.1,
     ):
         super().__init__()
         self.max_len = max_len
         self.use_risk_head = use_risk_head
         self.use_section_align = use_section_align
+        self.use_oct = use_oct
+        self.use_colposcopy = use_colposcopy
+        self.use_instruction = use_instruction
+        self.use_fused_visual = use_fused_visual
         self.oct_proj = nn.Linear(visual_dim, hidden_size)
         self.col_proj = nn.Linear(visual_dim, hidden_size)
         self.fused_proj = nn.Linear(visual_dim, hidden_size)
@@ -58,10 +66,10 @@ class PublishableLCADRASA(nn.Module):
         modality_mask: dict[str, bool] | None = None,
     ) -> torch.Tensor:
         m = modality_mask or {}
-        o = self.oct_proj(oct_emb) * (0.0 if m.get("mask_oct") else 1.0)
-        c = self.col_proj(col_emb) * (0.0 if m.get("mask_colposcopy") else 1.0)
-        f = self.fused_proj(fused_emb)
-        ins = self.instr_proj(instr_vec) * (0.0 if m.get("mask_instruction") else 1.0)
+        o = self.oct_proj(oct_emb) * (0.0 if m.get("mask_oct") or not self.use_oct else 1.0)
+        c = self.col_proj(col_emb) * (0.0 if m.get("mask_colposcopy") or not self.use_colposcopy else 1.0)
+        f = self.fused_proj(fused_emb) * (0.0 if not self.use_fused_visual else 1.0)
+        ins = self.instr_proj(instr_vec) * (0.0 if m.get("mask_instruction") or not self.use_instruction else 1.0)
         parts = [o, c, f, ins]
         if labels is not None and not m.get("randomize_label"):
             parts.append(self.label_embed(labels.clamp(0, 1)))
@@ -113,6 +121,8 @@ class PublishableLCADRASA(nn.Module):
             ids = [hash(w) % self.token_embed.num_embeddings for w in seed_text.split()[: self.max_len]]
             ids += [0] * max(0, self.max_len - len(ids))
             input_ids = torch.tensor([ids[: self.max_len]], dtype=torch.long, device=device)
+        else:
+            input_ids = input_ids.to(device)
 
         out = self.forward(oct_emb, col_emb, fused_emb, instr_vec, input_ids, lab_t, modality_mask=m)
         h0 = out["fused"]
