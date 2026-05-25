@@ -18,6 +18,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 MODEL_LABELS = {
     "real_report_only_decoder": "Real-report only",
+    "pseudo_augmented_lcad": "Pseudo-augmented (LCAD)",
     "simple_concat_fusion": "Simple concat fusion",
     "report_generation_without_section_alignment": "LCAD w/o section alignment",
     "full_lcad_rasa": "Full LCAD-RASA",
@@ -108,6 +109,7 @@ def build_t2_main_comparison() -> pd.DataFrame:
 
     core_ids = [
         "real_report_only_decoder",
+        "pseudo_augmented_lcad",
         "simple_concat_fusion",
         "report_generation_without_section_alignment",
         "full_lcad_rasa",
