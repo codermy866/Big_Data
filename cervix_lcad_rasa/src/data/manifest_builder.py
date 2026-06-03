@@ -1,4 +1,4 @@
-"""Build full_manifest.csv from JBD Exp0 modeling cohort (dual report centres)."""
+"""Build full_manifest.csv from the locked modeling cohort (dual report centres)."""
 
 from __future__ import annotations
 

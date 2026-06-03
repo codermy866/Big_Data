@@ -56,7 +56,7 @@ def extract_modality_summaries(
 
 
 def _summary_from_manifest_row(row: pd.Series, modality: str) -> str:
-    """Build text summaries from JBD Exp0 manifest columns (report-free features)."""
+    """Build text summaries from locked cohort manifest columns (report-free features)."""
     def _s(val: Any) -> str:
         if val is None or (isinstance(val, float) and np.isnan(val)):
             return ""

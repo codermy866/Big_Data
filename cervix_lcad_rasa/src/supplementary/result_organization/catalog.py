@@ -145,8 +145,4 @@ EXPERIMENT_CATALOG: list[dict[str, Any]] = [
      "purpose": "Qualitative success/failure cases", "main_script": "scripts/28 (E4)",
      "result_table_path": "outputs/publishable/qualitative_cases/table_qualitative_case_index.csv",
      "manuscript_use": "supplementary", "status": "missing"},
-    {"experiment_family": "remaining", "experiment_id": "ra_hydra_inclusion", "prompt_id": "E5",
-     "purpose": "RA-HyDRA-LLM inclusion decision", "main_script": "scripts/28 (E5)",
-     "result_table_path": "outputs/publishable/tables/RA_HYDRA_LLM_INCLUSION_DECISION.md",
-     "manuscript_use": "archive_only", "status": "missing"},
 ]

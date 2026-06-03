@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 def resolve_manifest_path(cfg: dict[str, Any], mock: bool) -> Path:
-    """Single source of truth: JBD Exp0 modeling CSV; mock writes a separate file."""
+    """Single source of truth: locked modeling CSV; mock writes a separate file."""
     mcfg = cfg.get("manifest", {})
     if mock:
         out_dir = ensure_dir(cfg["outputs"]["manifests"])
@@ -26,7 +26,7 @@ def resolve_manifest_path(cfg: dict[str, Any], mock: bool) -> Path:
         path = Path(modeling)
         if path.is_file():
             return path
-    # Fallback: JBD manifests next to repo
+    # Fallback: shared cohort manifests next to the LCAD-RASA project.
     fallback = Path(mcfg.get("jbd_manifest_dir", "../manifests")) / "patient_manifest_modeling.csv"
     return fallback.resolve()
 
@@ -50,7 +50,7 @@ def build_manifest(cfg: dict[str, Any], mock: bool = True) -> Path:
     if not registry_path.is_file():
         raise FileNotFoundError(
             f"JBD manifest not found at {out_path} and registry missing: {registry_path}. "
-            "Run JBD scripts/exp0_data_ledger_leakage_audit.py first."
+            "Provide the locked cohort CSV or update configs/data.yaml."
         )
     df = pd.read_csv(registry_path)
     if "modeling_eligible" in df.columns:

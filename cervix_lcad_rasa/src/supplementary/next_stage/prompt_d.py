@@ -10,8 +10,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from src.supplementary.io_utils import save_table
+from src.supplementary.jbd_figures_seaborn import PALETTE_MAIN, _setup_theme
 from src.supplementary.next_stage.core import collect_risk_scores, metrics_at_threshold, select_thresholds
 from src.supplementary.train_eval import load_jbd_config, resolve_checkpoint
 
@@ -59,13 +61,14 @@ def run_threshold_tuning(project: Path, df: pd.DataFrame, tables_dir: Path, base
     save_table(test_df, tables_dir / "table_threshold_tuned_test_metrics.csv", tables_dir / "table_threshold_tuned_test_metrics.md")
 
     if len(test_df):
+        _setup_theme()
         sub = test_df[test_df["threshold_type"] == "max_f1"]
         fig, ax = plt.subplots(figsize=(8, 5))
-        ax.bar(sub["experiment_id"].astype(str), sub["f1"].astype(float))
+        sns.barplot(data=sub, x="experiment_id", y="f1", palette=PALETTE_MAIN, ax=ax, legend=False)
         ax.set_title("Test F1 at validation-selected max-F1 threshold")
         plt.xticks(rotation=30, ha="right")
         plt.tight_layout()
-        fig.savefig(project / "outputs/publishable/figures/fig_threshold_f1_curves.png", dpi=150)
+        fig.savefig(project / "outputs/publishable/figures/fig_threshold_f1_curves.png", dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
     (tables_dir / "THRESHOLD_TUNING_INTERPRETATION.md").write_text(

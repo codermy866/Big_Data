@@ -1,4 +1,4 @@
-"""Execute R1–R3, S1–S3, E1–E5 result-organization prompts."""
+"""Execute R1-R3, S1-S3, E1-E4 result-organization prompts."""
 
 from __future__ import annotations
 
@@ -403,31 +403,6 @@ def run_e4(project: Path, pub: Path) -> None:
     )
 
 
-def run_e5(project: Path, tables: Path) -> None:
-    reg = project.parent / "results/experiment_registry.csv"
-    rows = []
-    if reg.is_file():
-        rows = pd.read_csv(reg).to_dict("records")
-    decision = """# RA-HyDRA-LLM Inclusion Decision
-
-## Recommendation
-**不建议纳入当前 LCAD-RASA JBD 主文；仅作独立未来工作或 Supplementary exploratory comparison（需先完成训练与同一 split）。**
-
-## Rationale
-1. **Task alignment**: RA-HyDRA-LLM (report-as-anchor at train, report-free inference) overlaps conceptually but is a separate model line (`hydra_core` / `ra_hydra_llm`), not the implemented LCAD-RASA pipeline.
-2. **Data version**: LCAD-RASA uses `cervix_lcad_rasa/outputs/publishable/manifests/` (1897 cases, 137591 images). RA-HyDRA registry entries are **planned**, not completed in `results/experiment_registry.csv`.
-3. **Metrics parity**: No comparable checkpoint metrics on the same test split for fair baseline comparison.
-4. **Narrative focus**: Main text already has six baselines + strict LOCO + RASA ablations; adding RA-HyDRA-LLM risks topic dilution.
-
-## If pursued later
-- Complete E002/E004 with identical patient-level split export from LCAD manifest.
-- Report only in Supplementary Table as exploratory comparison.
-"""
-    (tables / "RA_HYDRA_LLM_INCLUSION_DECISION.md").write_text(decision, encoding="utf-8")
-    write_csv(pd.DataFrame(rows) if rows else pd.DataFrame([{"note": "no completed runs"}]),
-              tables / "table_ra_hydra_llm_available_results.csv")
-
-
 def run_e1(project: Path, pub: Path, tables: Path) -> None:
     """Local vs mock pseudo-report QC comparison on stratified sample (API stub)."""
     import os
@@ -530,13 +505,12 @@ def run_all(project: Path, prompts: str) -> list[str]:
         "S3": lambda: run_s3(project, ms, tables),
         "E3": lambda: run_e3(project, tables),
         "E4": lambda: run_e4(project, pub),
-        "E5": lambda: run_e5(project, tables),
         "E1": lambda: run_e1(project, pub, tables),
         "E2": lambda: run_e2_stub(tables),
     }
     sel = list(order.keys()) if prompts.upper() in ("ALL", "") else [p.strip().upper() for p in prompts.split(",")]
     if prompts.upper() == "PRIORITY":
-        sel = ["R1", "R2", "R3", "S1", "S2", "E3", "E4", "S3", "E5", "E1", "E2"]
+        sel = ["R1", "R2", "R3", "S1", "S2", "E3", "E4", "S3", "E1", "E2"]
     for name in sel:
         if name not in order:
             continue

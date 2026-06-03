@@ -9,8 +9,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 from src.supplementary.io_utils import save_table
+from src.supplementary.jbd_figures_seaborn import _cmap_diverging, _setup_theme
 from src.supplementary.next_stage.core import default_full_spec, no_section_spec, real_only_spec
 from src.supplementary.train_eval import evaluate_experiment, load_jbd_config, train_experiment
 
@@ -79,17 +81,13 @@ def run_loco_strict(project: Path, df: pd.DataFrame, cfg: dict, loco_dir: Path, 
     save_table(out, tables_dir / "table_loco_strict_main_results.csv", tables_dir / "table_loco_strict_main_results.md")
 
     if len(out) and "auc" in out.columns:
+        _setup_theme()
         piv = out.pivot_table(index="model", columns="held_out_center", values="auc", aggfunc="mean")
         fig, ax = plt.subplots(figsize=(8, 5))
-        im = ax.imshow(piv.fillna(0).values, cmap="YlGnBu", vmin=0.4, vmax=1.0)
-        ax.set_xticks(range(len(piv.columns)))
-        ax.set_xticklabels(piv.columns, rotation=45, ha="right")
-        ax.set_yticks(range(len(piv.index)))
-        ax.set_yticklabels(piv.index)
-        ax.set_title("Strict LOCO — test AUC")
-        fig.colorbar(im, ax=ax)
+        sns.heatmap(piv, annot=True, fmt=".3f", cmap=_cmap_diverging(), vmin=0.4, vmax=1.0, ax=ax, linewidths=0.5)
+        ax.set_title("Strict LOCO — test AUROC")
         plt.tight_layout()
-        fig.savefig(project / "outputs/publishable/figures/fig_loco_strict_center_heatmap.png", dpi=150)
+        fig.savefig(project / "outputs/publishable/figures/fig_loco_strict_center_heatmap.png", dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
     (tables_dir / "LOCO_STRICT_INTERPRETATION.md").write_text(

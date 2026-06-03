@@ -32,7 +32,10 @@ class LocalLLMAgentClient:
             p = evidence.get(sub, {}).get("embedding_path", "")
             if p and Path(p).is_file():
                 v = np.load(p)
-                oct_sum = f"{oct_sum} [{key}_emb_norm={float(np.linalg.norm(v)):.2f}]"
+                if key == "oct":
+                    oct_sum = f"{oct_sum} [oct_emb_norm={float(np.linalg.norm(v)):.2f}]"
+                else:
+                    col_sum = f"{col_sum} [colposcopy_emb_norm={float(np.linalg.norm(v)):.2f}]"
         instr = evidence.get("instruction_evidence", {})
         clinical = f"Age {instr.get('age')}; HPV {instr.get('hpv')}; TCT {instr.get('tct')}."
         conf = 0.55 + 0.15 * evidence.get("oct_evidence", {}).get("evidence_reliability", 0)

@@ -24,8 +24,10 @@ def main():
     project = resolve_project_root()
     names = generate_all_seaborn_figures(project)
     logger.info("Generated %d figure groups", len(names))
-    print(f"Figures: {project / 'outputs/publishable/figures/jbd_final'}")
-    print(f"Legacy:  {project / 'outputs/publishable/figures'}")
+    print(f"jbd_final: {project / 'outputs/publishable/figures/jbd_final'}")
+    print(f"main:      {project / 'outputs/publishable/figures/main'}")
+    print(f"legacy:    {project / 'outputs/publishable/figures'}")
+    print("Palette: #8b98b3 #abb8cc #dbb98c #edd6b8 #b57979 #dea3a2 #b3b0b0 #d9d8d8")
 
     if args.refresh_submission_v2:
         import shutil

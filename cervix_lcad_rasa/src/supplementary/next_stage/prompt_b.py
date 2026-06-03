@@ -9,8 +9,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 from src.supplementary.io_utils import save_table
+from src.supplementary.jbd_figures_seaborn import PALETTE_MAIN, _setup_theme
 from src.supplementary.train_eval import evaluate_experiment, load_jbd_config, resolve_checkpoint
 
 
@@ -65,16 +67,15 @@ Do **not** interpret global ROUGE≈0 as model failure.
     (tables_dir / "REFERENCE_STRATIFIED_EVALUATION_INTERPRETATION.md").write_text(interp, encoding="utf-8")
 
     if len(out) and "auc" in out.columns:
+        _setup_theme()
         fig, ax = plt.subplots(figsize=(8, 5))
         ref = out[out["subset"] == "with_reference"]
         if len(ref):
-            for exp in ref["experiment_id"].unique():
-                sub = ref[ref["experiment_id"] == exp]
-                ax.bar(f"{exp}\n(ref)", sub["auc"].mean(), alpha=0.7)
-        ax.set_ylabel("AUC")
-        ax.set_title("AUC by model (reference-available subset)")
+            sns.barplot(data=ref, x="experiment_id", y="auc", palette=PALETTE_MAIN, ax=ax, legend=False)
+        ax.set_ylabel("AUROC")
+        ax.set_title("AUROC by model (reference-available subset)")
         plt.xticks(rotation=30, ha="right")
         plt.tight_layout()
-        fig.savefig(project / "outputs/publishable/figures/fig_reference_available_metric_comparison.png", dpi=150)
+        fig.savefig(project / "outputs/publishable/figures/fig_reference_available_metric_comparison.png", dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
     return out

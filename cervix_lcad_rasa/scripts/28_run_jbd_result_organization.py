@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""JBD result organization & remaining experiments (R1–R3, S1–S3, E1–E5)."""
+"""JBD result organization & remaining experiments (R1-R3, S1-S3, E1-E4)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def main():
     p.add_argument(
         "--prompt",
         default="priority",
-        help="R1,R2,... or priority (R1-R3,S1-S2,E3,E4,S3,E5,E1,E2) or all",
+        help="R1,R2,... or priority (R1-R3,S1-S2,E3,E4,S3,E1,E2) or all",
     )
     args = p.parse_args()
     project = resolve_project_root()

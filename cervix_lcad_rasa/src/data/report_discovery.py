@@ -1,4 +1,4 @@
-"""Discover archived report files under colposcopy folders (Exp0-compatible)."""
+"""Discover archived report files under colposcopy folders."""
 
 from __future__ import annotations
 

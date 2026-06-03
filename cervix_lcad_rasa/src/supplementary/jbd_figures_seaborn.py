@@ -22,30 +22,78 @@ MANUSCRIPT_REL = "outputs/publishable/tables/manuscript"
 PRED_REL = "outputs/publishable/predictions/final_per_case"
 TABLES_REL = "outputs/publishable/tables"
 
-# Seaborn gallery–style palette (husl + muted accents)
-PALETTE_MAIN = sns.color_palette("husl", 8)
+# JBD manuscript palette (user-specified)
+JBD_PALETTE_HEX = [
+    "#8b98b3",
+    "#abb8cc",
+    "#dbb98c",
+    "#edd6b8",
+    "#b57979",
+    "#dea3a2",
+    "#b3b0b0",
+    "#d9d8d8",
+]
+PALETTE_MAIN = sns.color_palette(JBD_PALETTE_HEX)
+C0, C1, C2, C3, C4, C5, C6, C7 = JBD_PALETTE_HEX
+PALETTE_SUPERVISION = [C0, C2]  # real report vs pseudo-report candidate
+PALETTE_BINARY = [C0, C4]  # negative vs positive (CIN2+)
+TEXT_DARK = "#3a3a3a"
+EDGE_DARK = C6
+GRID_LINE = C7
 PALETTE_MODEL = {
-    "Full LCAD-RASA": "#2A9D8F",
-    "LCAD w/o section alignment": "#E9C46A",
-    "Real-report only": "#E76F51",
-    "Simple concat fusion": "#8D99AE",
-    "Image-only report gen.": "#457B9D",
-    "Instruction-only report gen.": "#9B5DE5",
-    "Fusion w/o report anchor": "#F15BB5",
+    "Full LCAD-RASA": C0,
+    "Pseudo-augmented (LCAD)": C2,
+    "LCAD w/o section alignment": C5,
+    "Real-report only": C4,
+    "Simple concat fusion": C6,
+    "Image-only report gen.": C1,
+    "Instruction-only report gen.": C7,
+    "Fusion w/o report anchor": C3,
+    "Simple concat": C6,
+    "LCAD w/o section": C5,
 }
+
+
+def _cmap_sequential() -> object:
+    from matplotlib.colors import LinearSegmentedColormap
+
+    return LinearSegmentedColormap.from_list("jbd_seq", [C7, C3, C2, C4, C0], N=256)
+
+
+def _cmap_diverging() -> object:
+    from matplotlib.colors import LinearSegmentedColormap
+
+    return LinearSegmentedColormap.from_list("jbd_div", [C4, C7, C0], N=256)
 
 
 def _setup_theme() -> None:
     sns.set_theme(
         style="whitegrid",
         context="talk",
-        font_scale=0.85,
+        font="Arial",
+        font_scale=0.9,
+        palette=PALETTE_MAIN,
         rc={
             "figure.dpi": 120,
             "savefig.dpi": 300,
+            "font.family": "Arial",
+            "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
+            "mathtext.fontset": "stix",
+            "axes.unicode_minus": False,
             "axes.spines.top": False,
             "axes.spines.right": False,
-            "grid.alpha": 0.35,
+            "axes.titleweight": "bold",
+            "axes.labelweight": "bold",
+            "axes.titlesize": 14,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "legend.fontsize": 9,
+            "grid.alpha": 0.4,
+            "grid.color": GRID_LINE,
+            "axes.edgecolor": EDGE_DARK,
+            "axes.labelcolor": TEXT_DARK,
+            "text.color": TEXT_DARK,
         },
     )
 
@@ -93,13 +141,13 @@ def fig01_pipeline_schematic(out_dir: Path) -> None:
         "RASA section\nalignment",
         "Risk +\nstructured report",
     ]
-    colors = sns.color_palette("crest", len(stages))
+    colors = [JBD_PALETTE_HEX[i % len(JBD_PALETTE_HEX)] for i in range(len(stages))]
     xs = np.linspace(0.06, 0.94, len(stages))
     for i, (x, s, c) in enumerate(zip(xs, stages, colors)):
-        ax.add_patch(FancyBboxPatch((x - 0.075, 0.28), 0.15, 0.44, boxstyle="round,pad=0.02", fc=c, ec="#264653", lw=1.2, alpha=0.92))
-        ax.text(x, 0.5, s, ha="center", va="center", fontsize=9, color="#1d3557", fontweight="medium")
+        ax.add_patch(FancyBboxPatch((x - 0.075, 0.28), 0.15, 0.44, boxstyle="round,pad=0.02", fc=c, ec=EDGE_DARK, lw=1.2, alpha=0.92))
+        ax.text(x, 0.5, s, ha="center", va="center", fontsize=9, color=TEXT_DARK, fontweight="medium")
         if i < len(stages) - 1:
-            ax.annotate("", xy=(xs[i + 1] - 0.085, 0.5), xytext=(x + 0.085, 0.5), arrowprops=dict(arrowstyle="-|>", color="#264653", lw=2))
+            ax.annotate("", xy=(xs[i + 1] - 0.085, 0.5), xytext=(x + 0.085, 0.5), arrowprops=dict(arrowstyle="-|>", color=EDGE_DARK, lw=2))
     ax.set_title("LCAD-RASA: case-level report supervision under big-data cervical screening", fontsize=12, pad=12)
     _save(fig, out_dir / "Figure1_pipeline_schematic")
 
@@ -124,10 +172,10 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
         y="Count",
         hue="Supervision",
         kind="bar",
-        palette=["#2A9D8F", "#E76F51"],
+        palette=PALETTE_SUPERVISION,
         height=5,
         aspect=1.35,
-        edgecolor="#333",
+        edgecolor=EDGE_DARK,
         linewidth=0.6,
         legend_out=True,
     )
@@ -140,7 +188,7 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
     prop = long.copy()
     prop["fraction"] = prop.groupby("Centre")["Count"].transform(lambda x: x / x.sum())
     fig, ax = plt.subplots(figsize=(9, 4.5))
-    sns.lineplot(data=prop, x="Centre", y="fraction", hue="Supervision", marker="o", linewidth=2.5, ax=ax, palette=["#2A9D8F", "#E76F51"])
+    sns.lineplot(data=prop, x="Centre", y="fraction", hue="Supervision", marker="o", linewidth=2.5, ax=ax, palette=PALETTE_SUPERVISION)
     ax.set_ylabel("Fraction of cases")
     ax.set_title("Report supervision mix by centre")
     ax.set_ylim(0, 1.05)
@@ -182,11 +230,11 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
         piv,
         annot=True,
         fmt=".2f",
-        cmap="rocket_r",
+        cmap=_cmap_sequential(),
         vmin=0,
         vmax=1,
         linewidths=0.5,
-        linecolor="white",
+        linecolor=C7,
         cbar_kws={"label": "Similarity to normal"},
         ax=ax,
     )
@@ -197,7 +245,7 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
 
     # Lineplot with markers
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.lineplot(data=melt, x="condition", y="similarity", hue="section", marker="o", linewidth=2, ax=ax, palette="Set2")
+    sns.lineplot(data=melt, x="condition", y="similarity", hue="section", marker="o", linewidth=2, ax=ax, palette=PALETTE_MAIN)
     ax.set_ylim(0, 1.08)
     ax.set_title("Perturbation response by report section")
     ax.tick_params(axis="x", rotation=35)
@@ -214,12 +262,12 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
             y="risk_score_delta_vs_normal",
             size=10,
             jitter=0.25,
-            palette="mako",
+            palette=PALETTE_MAIN,
             ax=ax,
             alpha=0.85,
         )
-        sns.pointplot(data=sub, x="condition", y="risk_score_delta_vs_normal", color="#264653", markers="D", linestyles="-", ax=ax, errorbar=None)
-        ax.axhline(0, color="gray", ls="--", lw=1)
+        sns.pointplot(data=sub, x="condition", y="risk_score_delta_vs_normal", color=C0, markers="D", linestyles="-", ax=ax, errorbar=None)
+        ax.axhline(0, color=C6, ls="--", lw=1)
         ax.set_title("Risk score shift vs normal input")
         ax.tick_params(axis="x", rotation=35)
         fig.tight_layout()
@@ -246,13 +294,13 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
         pal = _model_palette(plot_df)
         for i, row in plot_df.iterrows():
             yi = list(plot_df.index).index(i)
-            c = pal.get(row["model"], "#333")
+            c = pal.get(row["model"], C6)
             ax.errorbar(
                 row["auc"],
                 yi,
                 xerr=[[row["auc"] - row["ci_low"]], [row["ci_high"] - row["auc"]]],
                 fmt="o",
-                ecolor="#555",
+                ecolor=C6,
                 elinewidth=2,
                 capsize=4,
                 markersize=10,
@@ -264,7 +312,7 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
         ax.set_xlabel("AUROC (95% bootstrap CI)")
         ax.set_title("Main model comparison (test n = 288)")
         ax.set_xlim(0.35, 0.95)
-        ax.axvline(0.5, color="gray", ls=":", lw=1, alpha=0.7)
+        ax.axvline(0.5, color=C6, ls=":", lw=1, alpha=0.7)
         fig.tight_layout()
         _save(fig, out_dir / "Figure_main_AUC_pointplot")
 
@@ -273,20 +321,22 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
     if mcols:
         hm = t2.set_index("model")[mcols]
         fig, ax = plt.subplots(figsize=(7, 4 + 0.35 * len(hm)))
-        sns.heatmap(hm, annot=True, fmt=".3f", cmap="vlag", center=0.5, vmin=0, vmax=1, ax=ax, cbar_kws={"label": "Score"})
+        sns.heatmap(hm, annot=True, fmt=".3f", cmap=_cmap_diverging(), center=0.5, vmin=0, vmax=1, ax=ax, cbar_kws={"label": "Score"})
         ax.set_title("Multi-metric profile (validation-selected threshold)")
         fig.tight_layout()
         _save(fig, out_dir / "Figure_main_metrics_heatmap")
 
     # F1 vs AUC scatter (joint-style)
     if "f1" in t2.columns and "auc" in t2.columns:
-        fig, ax = plt.subplots(figsize=(6.5, 6))
-        sns.scatterplot(data=t2, x="auc", y="f1", hue="model", s=180, palette=_model_palette(t2), ax=ax, edgecolor="white", linewidth=0.8)
+        fig, ax = plt.subplots(figsize=(8.2, 6))
+        sns.scatterplot(data=t2, x="auc", y="f1", hue="model", s=180, palette=_model_palette(t2), ax=ax, edgecolor=C7, linewidth=0.8)
         for _, r in t2.iterrows():
             ax.annotate(r["model"].split()[0], (r["auc"], r["f1"]), fontsize=7, alpha=0.8, xytext=(4, 4), textcoords="offset points")
         ax.set_xlim(0.3, 0.9)
+        ax.set_xlabel("AUROC")
+        ax.set_ylabel("F1 score")
         ax.set_title("Risk–semantic trade-off (AUC vs F1)")
-        ax.legend(loc="lower right", fontsize=7, title="Model")
+        ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8, title="Model", title_fontsize=9, frameon=False)
         fig.tight_layout()
         _save(fig, out_dir / "Figure_main_auc_f1_scatter")
     t2.to_csv(out_dir / "Figure_main_AUC_comparison_source.csv", index=False)
@@ -319,7 +369,7 @@ def fig_per_case_distributions(project: Path, out_dir: Path) -> None:
     core = allp[allp["model"].isin(["Full LCAD-RASA", "Real-report only", "Simple concat", "LCAD w/o section"])]
 
     fig, ax = plt.subplots(figsize=(11, 5.5))
-    sns.violinplot(data=core, x="model", y="risk_score", hue="CIN2+ label", split=True, inner="quart", palette=["#457B9D", "#E76F51"], ax=ax, linewidth=0.8)
+    sns.violinplot(data=core, x="model", y="risk_score", hue="CIN2+ label", split=True, inner="quart", palette=PALETTE_BINARY, ax=ax, linewidth=0.8)
     sns.swarmplot(data=core.sample(min(400, len(core)), random_state=42), x="model", y="risk_score", hue="CIN2+ label", dodge=True, size=2, alpha=0.35, ax=ax, legend=False)
     ax.set_title("Predicted risk distributions by model and true label (test set)")
     ax.set_ylabel("Risk score")
@@ -330,11 +380,11 @@ def fig_per_case_distributions(project: Path, out_dir: Path) -> None:
     # KDE for full model only
     full = allp[allp["model"] == "Full LCAD-RASA"]
     if len(full):
-        g = sns.displot(data=full, x="risk_score", hue="CIN2+ label", kind="kde", fill=True, height=4.5, aspect=1.4, palette=["#457B9D", "#E76F51"], linewidth=2)
+        g = sns.displot(data=full, x="risk_score", hue="CIN2+ label", kind="kde", fill=True, height=4.5, aspect=1.4, palette=PALETTE_BINARY, linewidth=2)
         g.fig.suptitle("Full LCAD-RASA: risk score density", y=1.02)
         _save(g.fig, out_dir / "Figure_full_model_kdeplot")
 
-        g2 = sns.jointplot(data=full, x="risk_score", y="correct", hue="CIN2+ label", kind="scatter", height=5, palette=["#457B9D", "#E76F51"], marginal_kws=dict(fill=True))
+        g2 = sns.jointplot(data=full, x="risk_score", y="correct", hue="CIN2+ label", kind="scatter", height=5, palette=PALETTE_BINARY, marginal_kws=dict(fill=True))
         g2.ax_joint.set_ylabel("Prediction correct (0/1)")
         g2.ax_joint.set_xlabel("Risk score")
         g2.fig.suptitle("Joint: risk vs correctness (Full LCAD-RASA)", y=1.02)
@@ -354,7 +404,7 @@ def supp_masking(project: Path, out_dir: Path) -> None:
     centres = [c for c in s10["center_id"].unique() if "pooled" not in str(c).lower()]
     sub = s10[s10["center_id"].isin(centres) | s10["center_id"].astype(str).str.contains("pooled")]
     fig, ax = plt.subplots(figsize=(9, 5))
-    sns.pointplot(data=sub, x="setting", y="label_consistency_mean", hue="center_id", markers="o", linestyles="-", ax=ax, palette="Set1", errorbar=None)
+    sns.pointplot(data=sub, x="setting", y="label_consistency_mean", hue="center_id", markers="o", linestyles="-", ax=ax, palette=PALETTE_MAIN, errorbar=None)
     ax.set_ylim(0.45, 0.82)
     ax.set_title("LCAD masking validation: label-consistency proxy")
     ax.tick_params(axis="x", rotation=20)
@@ -374,7 +424,7 @@ def supp_loco(project: Path, out_dir: Path) -> None:
     s2["model_short"] = s2["model"].astype(str).str.replace("_", " ")
     piv = s2.pivot_table(index="center_label", columns="model_short", values="auc", aggfunc="mean")
     fig, ax = plt.subplots(figsize=(8, 5))
-    sns.heatmap(piv, annot=True, fmt=".3f", cmap="icefire", center=0.65, vmin=0.3, vmax=1, ax=ax, linewidths=0.5)
+    sns.heatmap(piv, annot=True, fmt=".3f", cmap=_cmap_diverging(), center=0.65, vmin=0.3, vmax=1, ax=ax, linewidths=0.5)
     ax.set_title("Strict LOCO: AUROC by held-out centre and model")
     fig.tight_layout()
     _save(fig, out_dir / "fig_loco_heatmap")
@@ -389,12 +439,12 @@ def supp_loco(project: Path, out_dir: Path) -> None:
         join=False,
         height=5,
         aspect=1.3,
-        palette="tab10",
+        palette=PALETTE_MAIN,
         markers="d",
         linestyles="",
     )
     g.set(xlabel="AUROC", title="Cross-centre generalisation (LOCO)")
-    g.ax.axvline(0.5, ls=":", c="gray")
+    g.ax.axvline(0.5, ls=":", c=C6)
     _save(g.fig, out_dir / "Figure4_loco_forest_catplot")
     _save(g.fig, out_dir / "SupplementaryFigure_S2_loco_catplot")
 
@@ -405,8 +455,8 @@ def supp_lambda_sweep(project: Path, out_dir: Path) -> None:
         return
     _setup_theme()
     fig, ax = plt.subplots(figsize=(7, 4.5))
-    sns.lineplot(data=s1, x="lambda_align", y="auc", marker="o", linewidth=2.5, color="#2A9D8F", ax=ax)
-    ax.fill_between(s1["lambda_align"], s1["auc"] - 0.02, s1["auc"] + 0.02, alpha=0.2, color="#2A9D8F")
+    sns.lineplot(data=s1, x="lambda_align", y="auc", marker="o", linewidth=2.5, color=C0, ax=ax)
+    ax.fill_between(s1["lambda_align"], s1["auc"] - 0.02, s1["auc"] + 0.02, alpha=0.2, color=C0)
     ax.set_xlabel("RASA section-alignment weight λ_align")
     ax.set_ylabel("AUROC")
     ax.set_title("Hyperparameter sweep: λ_align vs discrimination")
@@ -423,7 +473,7 @@ def supp_modality_ablation(project: Path, out_dir: Path) -> None:
     s3["modality_set"] = s3["experiment_id"].str.replace("_", " + ")
     s3 = s3.sort_values("auc", ascending=False)
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.barplot(data=s3, y="modality_set", x="auc", palette=sns.color_palette("flare", len(s3)), ax=ax, orient="h")
+    sns.barplot(data=s3, y="modality_set", x="auc", palette=PALETTE_MAIN[: len(s3)], ax=ax, orient="h")
     ax.set_xlim(0.55, 0.85)
     ax.set_title("Modality ablation: AUROC by input combination")
     fig.tight_layout()
@@ -431,8 +481,8 @@ def supp_modality_ablation(project: Path, out_dir: Path) -> None:
 
     # Dot + strip composite
     fig, ax = plt.subplots(figsize=(7, 5))
-    sns.stripplot(data=s3, x="auc", y="modality_set", size=12, palette="viridis", ax=ax, jitter=False)
-    sns.pointplot(data=s3, x="auc", y="modality_set", color="#264653", markers="X", linestyles="", ax=ax)
+    sns.stripplot(data=s3, x="auc", y="modality_set", size=12, palette=PALETTE_MAIN, ax=ax, jitter=False)
+    sns.pointplot(data=s3, x="auc", y="modality_set", color=C0, markers="X", linestyles="", ax=ax)
     ax.set_title("Modality subsets (strip + point)")
     fig.tight_layout()
     _save(fig, out_dir / "fig_modality_ablation_stripplot")
@@ -449,7 +499,7 @@ def supp_rasa_components(project: Path, out_dir: Path) -> None:
     s5 = s5.copy()
     s5["delta_auc"] = s5["auc"] - ref_auc
     fig, ax = plt.subplots(figsize=(9, 4.5))
-    colors = ["#d62728" if v < 0 else "#2ca02c" for v in s5["delta_auc"]]
+    colors = [C4 if v < 0 else C0 for v in s5["delta_auc"]]
     sns.barplot(data=s5, x="experiment_id", y="delta_auc", palette=colors, ax=ax, legend=False)
     ax.axhline(0, color="k", lw=0.8)
     ax.set_title("RASA component ablation: ΔAUROC vs full model")
@@ -461,7 +511,7 @@ def supp_rasa_components(project: Path, out_dir: Path) -> None:
     if "f1" in s5.columns:
         melt = s5.melt(id_vars=["experiment_id"], value_vars=["auc", "f1"], var_name="metric", value_name="value")
         fig, ax = plt.subplots(figsize=(8, 4))
-        sns.boxenplot(data=melt, x="experiment_id", y="value", hue="metric", palette="pastel", ax=ax)
+        sns.boxenplot(data=melt, x="experiment_id", y="value", hue="metric", palette=[C1, C3], ax=ax)
         ax.set_title("Component ablation metrics (boxen)")
         ax.tick_params(axis="x", rotation=35)
         fig.tight_layout()
@@ -495,7 +545,7 @@ def supp_multiseed(project: Path, out_dir: Path) -> None:
 
     # Facet by metric
     g = sns.FacetGrid(s7, col="metric", height=3.5, aspect=1.1, sharey=False)
-    g.map_dataframe(sns.pointplot, x="model", y="mean", errorbar=None, palette="husl")
+    g.map_dataframe(sns.pointplot, x="model", y="mean", errorbar=None, palette=PALETTE_MAIN)
     g.set_xticklabels(rotation=25)
     g.fig.suptitle("Stability across metrics and seeds", y=1.05)
     _save(g.fig, out_dir / "fig_multiseed_facetgrid")
@@ -506,8 +556,8 @@ def supp_qc_and_scalability(project: Path, out_dir: Path) -> None:
     if s4 is not None:
         _setup_theme()
         fig, ax = plt.subplots(figsize=(8, 4))
-        sns.boxplot(data=s4, x="experiment_id", y="auc", palette="Blues", ax=ax, linewidth=0.8)
-        sns.swarmplot(data=s4, x="experiment_id", y="auc", color="#264653", size=7, ax=ax)
+        sns.boxplot(data=s4, x="experiment_id", y="auc", palette=[C1, C0, C2], ax=ax, linewidth=0.8)
+        sns.swarmplot(data=s4, x="experiment_id", y="auc", color=C0, size=7, ax=ax)
         ax.set_title("LCAD QC ablation (box + swarm)")
         ax.tick_params(axis="x", rotation=30)
         fig.tight_layout()
@@ -520,7 +570,7 @@ def supp_qc_and_scalability(project: Path, out_dir: Path) -> None:
         key = pipe[pipe["metric"].isin(["total_cases", "total_images", "real_report_cases", "pseudo_report_cases"])]
         if len(key):
             fig, ax = plt.subplots(figsize=(7, 4))
-            sns.barplot(data=key, x="value", y="metric", palette="crest", orient="h", ax=ax)
+            sns.barplot(data=key, x="value", y="metric", palette=PALETTE_MAIN[:4], orient="h", ax=ax)
             ax.set_xscale("log")
             ax.set_xlabel("Count (log scale)")
             ax.set_title("Pipeline scale (S11)")
@@ -539,14 +589,14 @@ def supp_qc_and_scalability(project: Path, out_dir: Path) -> None:
         fig, ax = plt.subplots(figsize=(8, 4.5))
         if "OCT images" in c.columns:
             melt = c.melt(id_vars=["Centre"], value_vars=["OCT images", "Colposcopy images"], var_name="Modality", value_name="Images")
-            sns.barplot(data=melt, x="Centre", y="Images", hue="Modality", palette="muted", ax=ax)
+            sns.barplot(data=melt, x="Centre", y="Images", hue="Modality", palette=PALETTE_SUPERVISION, ax=ax)
             ax.set_yscale("log")
             ax.set_title("Imaging volume by centre (log scale)")
         elif "Cases" in c.columns:
-            sns.barplot(data=c, x="Centre", y="Cases", hue="Centre", palette="mako", ax=ax, legend=False)
+            sns.barplot(data=c, x="Centre", y="Cases", hue="Centre", palette=PALETTE_MAIN, ax=ax, legend=False)
             ax.set_title("Cases per centre")
         elif "cases" in c.columns:
-            sns.barplot(data=c, x="center", y="cases", hue="center", palette="mako", ax=ax, legend=False)
+            sns.barplot(data=c, x="center", y="cases", hue="center", palette=PALETTE_MAIN, ax=ax, legend=False)
             ax.set_title("Cases per centre")
         ax.tick_params(axis="x", rotation=18)
         fig.tight_layout()
@@ -568,7 +618,7 @@ def supp_perturbation_extended(project: Path, out_dir: Path) -> None:
     if "condition" not in melt.columns:
         return
     piv = melt.pivot_table(index="condition", columns="metric", values="value", aggfunc="mean")
-    cg = sns.clustermap(piv.fillna(0), cmap="mako_r", figsize=(10, 8), linewidths=0.3, annot=True, fmt=".2f", dendrogram_ratio=0.12)
+    cg = sns.clustermap(piv.fillna(0), cmap=_cmap_sequential(), figsize=(10, 8), linewidths=0.3, annot=True, fmt=".2f", dendrogram_ratio=0.12)
     cg.fig.suptitle("Extended perturbation: clustered similarity", y=1.02)
     _save(cg.fig, out_dir / "fig_perturbation_section_dependency_heatmap")
     _save(cg.fig, out_dir / "fig_perturbation_clustermap")
@@ -582,8 +632,8 @@ def supp_pairwise_tests(project: Path, out_dir: Path) -> None:
     pw = pw.copy()
     pw["neg_log_p"] = -np.log10(pw["bootstrap_p_auc"].clip(1e-6, 1))
     fig, ax = plt.subplots(figsize=(9, 4))
-    sns.scatterplot(data=pw, x="delta_auc", y="neg_log_p", hue="comparator", s=120, palette="Set2", ax=ax, edgecolor="w")
-    ax.axvline(0, color="gray", ls="--")
+    sns.scatterplot(data=pw, x="delta_auc", y="neg_log_p", hue="comparator", s=120, palette=PALETTE_MAIN, ax=ax, edgecolor=C7)
+    ax.axvline(0, color=C6, ls="--")
     ax.set_xlabel("ΔAUROC (comparator − Full LCAD-RASA)")
     ax.set_ylabel("−log10(bootstrap p)")
     ax.set_title("Paired comparisons vs full model")
@@ -592,11 +642,31 @@ def supp_pairwise_tests(project: Path, out_dir: Path) -> None:
     _save(fig, out_dir / "fig_pairwise_comparison_scatter")
 
 
+MAIN_FIGURE_ALIASES = {
+    "Figure1_study_design": "Figure1_pipeline_schematic",
+    "Figure2_centre_supervision": "Figure2_centre_supervision_catplot",
+    "Figure3_perturbation": "Figure3_modality_perturbation_heatmap",
+    "Figure4_loco_strict": "Figure4_loco_forest_catplot",
+}
+
+
+def _sync_main_figures(jbd_final: Path, main_dir: Path) -> None:
+    """Copy canonical main-text figure names into figures/main/."""
+    main_dir.mkdir(parents=True, exist_ok=True)
+    for alias, stem in MAIN_FIGURE_ALIASES.items():
+        for ext in (".png", ".pdf"):
+            src = jbd_final / f"{stem}{ext}"
+            if src.is_file():
+                shutil.copy2(src, main_dir / f"{alias}{ext}")
+
+
 def write_figure_index(out_dir: Path, entries: list[tuple[str, str, str]]) -> None:
+    palette_line = ", ".join(JBD_PALETTE_HEX)
     lines = [
-        "# JBD Figure Index (Seaborn gallery style)\n",
+        "# JBD Figure Index (JBD palette)\n",
         f"Regenerated: {datetime.now(timezone.utc).isoformat()}\n",
-        "Reference: https://seaborn.pydata.org/examples/index.html\n\n",
+        f"Palette: {', '.join(JBD_PALETTE_HEX)}\n",
+        "Font: Arial with bold figure titles and axis labels\n\n",
     ]
     for stem, plot_type, desc in entries:
         lines.append(f"## {stem}\n- **Plot type**: {plot_type}\n- {desc}\n- Files: `{stem}.png`, `{stem}.pdf`\n\n")
@@ -675,7 +745,17 @@ def generate_all_seaborn_figures(project: Path) -> list[str]:
     supp_pairwise_tests(project, jbd_final)
     entries.append(("fig_pairwise_comparison_scatter", "scatterplot", "Paired statistical tests"))
 
+    main_dir = project / "outputs/publishable/figures/main"
+    _sync_main_figures(jbd_final, main_dir)
+
+    # Legacy composite name used in manuscript
+    for ext in (".png", ".pdf"):
+        src = jbd_final / f"Figure_main_AUC_pointplot{ext}"
+        if src.is_file():
+            shutil.copy2(src, pub_fig / f"Figure_main_AUC_comparison{ext}")
+
     write_figure_index(jbd_final, entries)
     write_figure_index(pub_fig, entries)
+    write_figure_index(main_dir, entries)
 
     return [e[0] for e in entries]

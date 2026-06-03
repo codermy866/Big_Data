@@ -15,3 +15,8 @@ outputs/
 embeddings/
 checkpoints/
 pseudo_reports*/
+.env
+.env.*
+*.env
+.secrets/
+secrets/

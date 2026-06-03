@@ -9,8 +9,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 from src.supplementary.io_utils import save_table
+from src.supplementary.jbd_figures_seaborn import C6, PALETTE_MAIN, _setup_theme
 from src.supplementary.next_stage.core import default_full_spec, no_section_spec, real_only_spec
 from src.supplementary.statistics import bootstrap_ci
 from src.supplementary.train_eval import evaluate_experiment, load_jbd_config, train_experiment
@@ -49,12 +51,14 @@ def run_multiseed(project: Path, df: pd.DataFrame, cfg: dict, seed_dir: Path, ta
     save_table(summ_df, tables_dir / "table_multiseed_stability.csv", tables_dir / "table_multiseed_stability.md")
 
     if len(raw) and "auc" in raw.columns:
+        _setup_theme()
         fig, ax = plt.subplots(figsize=(7, 5))
-        raw.boxplot(column="auc", by="model", ax=ax)
-        ax.set_title("Multi-seed test AUC")
-        plt.suptitle("")
+        sns.boxplot(data=raw, x="model", y="auc", palette=PALETTE_MAIN, ax=ax, linewidth=0.8)
+        sns.stripplot(data=raw, x="model", y="auc", color=C6, size=5, alpha=0.6, ax=ax, jitter=0.15)
+        ax.set_title("Multi-seed test AUROC")
+        ax.tick_params(axis="x", rotation=20)
         plt.tight_layout()
-        fig.savefig(project / "outputs/publishable/figures/fig_multiseed_auc_boxplot.png", dpi=150)
+        fig.savefig(project / "outputs/publishable/figures/fig_multiseed_auc_boxplot.png", dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
     (tables_dir / "MULTISEED_STABILITY_INTERPRETATION.md").write_text(

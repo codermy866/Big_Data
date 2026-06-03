@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.supplementary.io_utils import save_table
+from src.supplementary.jbd_figures_seaborn import C0, C7, _setup_theme
+
 from src.supplementary.next_stage.core import default_full_spec
 from src.supplementary.train_eval import evaluate_experiment, load_jbd_config, train_experiment
 
@@ -57,19 +59,20 @@ def run_loss_sweep(project: Path, df: pd.DataFrame, cfg: dict, sweep_dir: Path, 
         out.attrs["best_lcad_rasa_lambda"] = best_lam
 
     if "auc" in out.columns and "lambda_align" in out.columns:
+        _setup_theme()
         for xcol, fname, title in [
             ("section_completeness", "fig_rasa_pareto_auc_vs_section_alignment.png", "AUC vs section completeness"),
             ("hallucination_rate", "fig_rasa_pareto_auc_vs_safety.png", "AUC vs hallucination rate"),
         ]:
             fig, ax = plt.subplots(figsize=(6, 5))
-            ax.scatter(out[xcol], out["auc"])
+            ax.scatter(out[xcol], out["auc"], c=C0, edgecolors=C7, s=80, linewidth=0.8)
             for _, r in out.iterrows():
                 ax.annotate(str(r["lambda_align"]), (r[xcol], r["auc"]), fontsize=8)
-            ax.set_xlabel(xcol)
-            ax.set_ylabel("AUC")
+            ax.set_xlabel(xcol.replace("_", " "))
+            ax.set_ylabel("AUROC")
             ax.set_title(title)
             plt.tight_layout()
-            fig.savefig(project / "outputs/publishable/figures" / fname, dpi=150)
+            fig.savefig(project / "outputs/publishable/figures" / fname, dpi=300, bbox_inches="tight", facecolor="white")
             plt.close(fig)
 
     risk_best = out.loc[out["auc"].idxmax()] if len(out) else None
