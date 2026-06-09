@@ -1,0 +1,74 @@
+\section{Experiments and Results}
+\label{sec:experiments_results}
+
+\subsection{Evaluation roadmap}
+\label{subsec:evaluation_roadmap}
+
+The experimental evaluation was designed to determine whether LCAD--RASA provides a reproducible framework for report-aware multimodal fusion under sparse and centre-dependent report supervision. Rather than treating pseudo-report generation, semantic alignment, diagnostic prediction, and robustness as independent technical checks, we organised the evaluation around five questions. First, we quantified the five-centre cohort scale and the imbalance between available multimodal data and available clinician-report supervision. Second, we audited whether structured pseudo reports encoded modality-grounded evidence rather than simple label templates, and whether the pseudo-report generation layer was replaceable across LLM providers. Third, we evaluated whether report sections could serve as explicit semantic alignment targets for OCT, colposcopy, clinical-context, and fused representations. Fourth, we assessed the downstream diagnostic behaviour of the full LCAD--RASA configuration on the locked held-out test set and through targeted ablations. Fifth, we examined centre shift, perturbation fidelity, report safety, stability, and scalability to delimit the valid scope of the claims.
+
+Table~\ref{tab:experiment_output_map} summarises the mapping between experiments, outputs, and intended interpretation. Unless otherwise specified, AUROC and F1 were evaluated at validation-selected thresholds, and uncertainty was estimated using bootstrap confidence intervals. Paired bootstrap testing did not support a statistical superiority claim for the main diagnostic comparison; therefore, downstream results are reported as point-estimate improvements under the locked protocol rather than as statistically significant superiority. Retrieval metrics, perturbation metrics, and pseudo-report quality metrics are interpreted as mechanistic and quality-control evidence, not as clinical diagnostic endpoints.
+
+\subsection{Five-centre multimodal cohort and report-supervision imbalance}
+\label{subsec:cohort_supervision_results}
+
+The final analytic cohort consisted of 1,897 multimodal cervical screening cases from five centres, with 137,591 evaluable OCT and colposcopy images (Table~\ref{tab:cohort_summary}; Figure~\ref{fig:centre_supervision}). This cohort provides the imaging and structured clinical basis for multimodal fusion, but report-level semantic supervision was substantially less complete. Archived real reports were available for 744 cases, whereas 1,153 cases lacked archived reports and were therefore treated as pseudo-report candidates.
+
+Report availability was strongly centre-dependent. Enshi retained real reports for all 406 cases, Jingzhou retained reports for 334 of 406 cases, Xiangyang retained reports for only 4 of 500 cases, and Wuhan and Shiyan had no centre-wide real-report archives. This distribution establishes the central supervision problem addressed by LCAD--RASA: multimodal clinical and imaging data are available at scale, whereas report-level supervision is sparse and unevenly distributed across centres. Accordingly, the pseudo-report component is not framed as a substitute for expert reporting, but as a structured semantic-completion strategy for retrospective multimodal learning under incomplete report archives.
+
+\subsection{Structured pseudo-report generation and provider audit}
+\label{subsec:pseudo_report_results}
+
+We next evaluated whether pseudo reports were merely label-to-text templates or whether they preserved modality-specific report sections. The label-template baseline was schema-complete but contained no modality support, with a mean modality support rate of 0.000 and a maximum duplicate fraction of 0.867 (Table~\ref{tab:pseudo_source_comparison}; Figure~\ref{fig:pseudo_source_comparison}). This confirmed that template reports can satisfy formatting constraints while still failing to provide meaningful multimodal semantic supervision. In contrast, the rule-based and local embedding-assisted LLM pseudo-report baselines retained OCT, colposcopy, and clinical-context sections, with a mean modality support rate of 1.000 for both. The rule-based baseline achieved a label-consistency mean of 0.628, and the local LLM baseline achieved the same label-consistency mean while preserving modality-grounded report sections.
+
+We further compared external LLM providers to test whether pseudo-report generation depended on a single proprietary model. Template, rule-based, local embedding LLM, Qwen-Plus, GLM-4.7-Flash, Gemini-3.1-Pro, and GPT-5.5 were evaluated under the same structured-report schema (Table~\ref{tab:llm_provider_comparison}; Figures~\ref{fig:api_provider_summary_heatmap}, \ref{fig:api_quality_heatmap}, and~\ref{fig:api_reliability}). All evaluated sources produced schema-valid structured outputs in their available cohorts. GPT-5.5 was evaluated on the extended 100-case cohort and generated 100 valid structured reports, with schema-valid rate 1.000, section completeness 0.810, modality support 0.810, contradiction rate 0.050, hallucination rate 0.000, mean latency 11.39 seconds per case, and estimated cost of US\$27.73 per 1,000 cases. Qwen-Plus, GLM-4.7-Flash, and Gemini-3.1-Pro were retained as pilot cohorts and are therefore interpreted as provider-feasibility evidence rather than as full-scale head-to-head evidence.
+
+Only de-identified structured evidence was sent to external APIs. Raw images, image paths, patient names, internal patient identifiers, and hospital identifiers were not transmitted. These results support the use of pseudo-report generation as a configurable and auditable layer in LCAD--RASA, while preserving the distinction between structured semantic augmentation and physician-authored reports.
+
+\subsection{Report-section alignment as explicit cross-modal semantic supervision}
+\label{subsec:alignment_results}
+
+To test whether report sections provided usable cross-modal semantic targets, we performed a direct retrieval-alignment analysis. OCT embeddings were paired with \texttt{oct\_findings}, colposcopy embeddings with \texttt{colposcopy\_findings}, clinical embeddings with \texttt{clinical\_context}, and fused representations with \texttt{impression}. Full LCAD--RASA achieved a macro mean reciprocal rank (MRR) of 0.049 across the four sections, whereas removing section alignment reduced macro MRR to 0.022 and simple concatenation fusion remained low at 0.020 (Table~\ref{tab:theme1_alignment_ablation}; Figure~\ref{fig:alignment_retrieval_mrr}). The highest retrieval-only macro MRR was observed for the real-report-only variant (0.056), indicating that alignment metrics should be interpreted together with downstream risk prediction rather than as a standalone ranking of clinical utility.
+
+The staged API alignment analysis provided an additional view of provider-dependent semantic alignment. Gemini-3.1-Pro had the highest available pilot macro MRR of 0.366, whereas GPT-5.5 on the extended cohort had a macro MRR of 0.063 (Figures~\ref{fig:api_alignment_mrr} and~\ref{fig:api_section_mrr}). Because these cohorts differed in scale and stage, these values are used to assess feasibility and alignment behaviour rather than to rank providers definitively. Overall, the retrieval analyses support the central semantic-alignment claim: LLM-derived report sections can function as explicit alignment targets for modality-specific and fused representations.
+
+\subsection{Pseudo-report augmentation under report-supervision scarcity}
+\label{subsec:scarcity_results}
+
+We then evaluated whether pseudo-report augmentation remained useful when real-report supervision was artificially reduced. The report-supervision scarcity curve showed that augmentation was most beneficial in low-supervision regimes (Table~\ref{tab:scarcity_curve}; Figure~\ref{fig:scarcity_curve}). At 10\% real-report availability, the LCAD-augmented surrogate achieved AUROC 0.818 and F1 0.502, compared with AUROC 0.636 and F1 0.297 for the real-report-only surrogate. At full real-report availability, the augmented surrogate also remained higher, with AUROC 0.841 compared with 0.796 for the real-report-only surrogate.
+
+The staged API downstream surrogate was intentionally conservative. GPT-5.5 achieved AUROC 0.630 and F1 0.229 at 10\% real-report availability on the extended cohort, whereas Gemini-3.1-Pro achieved AUROC 0.725 and F1 0.379 in its pilot cohort (Figure~\ref{fig:api_scarcity_auc}). These analyses show that structured pseudo-report augmentation can improve surrogate downstream behaviour under report scarcity, but they do not replace full end-to-end LCAD--RASA retraining.
+
+\subsection{Held-out diagnostic performance}
+\label{subsec:diagnostic_results}
+
+On the locked held-out test set ($n=288$), Full LCAD--RASA achieved AUROC 0.832 (95\% CI 0.757--0.897) and F1 0.611 (95\% CI 0.458--0.737) at the validation-selected threshold of 0.37 (Table~\ref{tab:main_comparison}; Figures~\ref{fig:main_auc}, \ref{fig:main_metrics}, and~\ref{fig:main_auc_f1}). Pseudo-augmented LCAD training achieved AUROC 0.826 (95\% CI 0.747--0.894) and F1 0.545 (95\% CI 0.395--0.674). Real-report-only training achieved AUROC 0.725, whereas simple concatenation fusion achieved AUROC 0.472.
+
+These results indicate that the full LCAD--RASA configuration produced the highest point estimates in the locked held-out comparison. However, because paired bootstrap testing did not support a statistical superiority claim, the valid conclusion is that LCAD--RASA achieved numerically higher held-out performance under the locked protocol. The comparison is therefore used as evidence that report-aware semantic alignment and pseudo-report augmentation are useful within this retrospective experimental setting, not as proof of clinical superiority.
+
+\subsection{Ablation evidence for the RASA design}
+\label{subsec:ablation_results}
+
+Targeted ablations were used to isolate the contribution of report-section alignment and other RASA components. Removing section alignment substantially reduced direct alignment quality, with macro MRR decreasing from 0.049 for Full LCAD--RASA to 0.022 (Table~\ref{tab:theme1_alignment_ablation}). The held-out model comparison showed that the LCAD variant without section alignment retained strong discrimination, with AUROC 0.826, but had a lower F1 score of 0.510 compared with 0.611 for Full LCAD--RASA (Table~\ref{tab:main_comparison}). This pattern suggests that section alignment may affect operating-point behaviour and error balance even when AUROC remains similar.
+
+Additional modality, quality-control, alignment-weight, and component ablations are reported in Supplementary Tables~S1 and S3--S5 and Figures~\ref{fig:rasa_component_boxenplot}, \ref{fig:rasa_lambda}, and~\ref{fig:qc_ablation}. These analyses support the internal consistency of the RASA design, but they should be interpreted as diagnostic ablations rather than definitive causal proof of the alignment mechanism.
+
+\subsection{Perturbation fidelity and modality-grounded decoding}
+\label{subsec:perturbation_results}
+
+To examine whether generated report sections depended on the corresponding modality evidence, we masked or shuffled OCT, colposcopy, clinical instruction, and visual streams. The upgraded perturbation matrix showed selective degradation when modality-specific evidence was removed (Table~\ref{tab:perturbation_matrix}; Figures~\ref{fig:perturbation_heatmap}, \ref{fig:perturbation_lineplot}, \ref{fig:risk_delta}, and~\ref{fig:theme1_perturbation}). Masking OCT produced a 0.743 drop in the OCT findings section, masking colposcopy produced a 1.000 drop in the colposcopy findings section, and masking clinical instruction produced a 0.833 drop in the clinical-context section. Label-only inference produced the largest overall report drop of 0.466 and the largest absolute risk shift of 0.371.
+
+The section-specific degradation pattern indicates that LCAD--RASA does not rely solely on fixed templates or label copying. Instead, report sections show measurable dependence on their corresponding modality streams. These perturbation results provide fidelity evidence for modality-grounded decoding, while avoiding the stronger and unsupported claim that the model provides a causal clinical explanation.
+
+\subsection{Reference-stratified and cross-centre evaluation}
+\label{subsec:loco_results}
+
+Reference-stratified held-out evaluation showed that Full LCAD--RASA achieved AUROC 0.824 in cases with reference reports ($n=108$) and AUROC 0.850 in cases without reference reports ($n=180$). This pattern suggests that the model's held-out behaviour was not restricted to the subset with archived reference reports, although the analysis remains retrospective and conditioned on the available cohort composition.
+
+Strict leave-one-centre-out (LOCO) retraining revealed substantial centre-dependent behaviour. Under the fixed quick-budget protocol, held-out AUROC was 0.702 for Enshi, 0.648 for Jingzhou, and 0.382 for Xiangyang (Supplementary Tables~S2 and S2b; Figures~\ref{fig:loco_heatmap} and~\ref{fig:loco_forest}). Eval-only LOCO with a global checkpoint is reported separately and is not pooled with strict LOCO retraining. These findings identify centre shift as a remaining limitation and justify reporting centre-specific behaviour rather than relying only on pooled held-out metrics.
+
+\subsection{Robustness, safety, and scalability}
+\label{subsec:robustness_safety_scalability}
+
+Robustness and safety analyses included masking validation, modality ablations, quality-control ablations, multi-seed stability, report-level safety metrics, and runtime summaries (Supplementary Tables~S7--S11; Supplementary Figure~\ref{fig:supplementary_robustness}). The pipeline processed approximately 137k images, and publishable model checkpoints were approximately 80 MB, supporting computational feasibility for retrospective big-data analytics.
+
+An expert-rating template was prepared, but physician scores were not available for the present manuscript version. Therefore, claims of physician validation, expert-validated report quality, clinical deployment readiness, or prospective decision support are not made. The evidence supports a reproducible retrospective framework for LLM-augmented multimodal fusion under incomplete report supervision, while prospective clinical validation remains necessary before deployment-oriented claims can be made.

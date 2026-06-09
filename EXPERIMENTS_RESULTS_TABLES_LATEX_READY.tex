@@ -1,0 +1,496 @@
+% Auto-generated LaTeX tables for the pasted Experiments and Results section.
+
+% Required packages: \usepackage{booktabs,graphicx}.
+
+% Wide tables use table* and \resizebox{\linewidth}{!}{...}.
+
+\begin{table*}[t]
+  \centering
+  \caption{Five-centre cohort scale and report-supervision availability.}
+  \label{tab:baseline_all3000_5cens}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Centre & Cases & OCT images & Colposcopy images & Total images & Real reports & Pseudo candidates \\
+    \midrule
+    Overall & 1,897 & 129,030 & 8,561 & 137,591 & 744 & 1,153 \\
+    Enshi & 406 & 48,504 & 1,233 & 49,737 & 406 & 0 \\
+    Jingzhou & 406 & 12,428 & 2,967 & 15,395 & 334 & 72 \\
+    Shiyan & 496 & 14,267 & 1,488 & 15,755 & 0 & 496 \\
+    Wuda & 89 & 10,680 & 267 & 10,947 & 0 & 89 \\
+    Xiangyang & 500 & 43,151 & 2,606 & 45,757 & 4 & 496 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Structured pseudo-report source comparison.}
+  \label{tab:pseudo_source_comparison}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Source & $n$ & Complete & Label consistency & Modality support & Unique text & Duplicate fraction \\
+    \midrule
+    Label template & 180 & 1.000 & 0.567 & 0.000 & 0.011 & 0.867 \\
+    Rule-based & 180 & 1.000 & 0.628 & 1.000 & 0.194 & 0.200 \\
+    Local embedding LLM & 180 & 1.000 & 0.628 & 1.000 & 0.156 & 0.261 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{LLM provider comparison for structured pseudo-report generation.}
+  \label{tab:llm_provider_comparison}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    Metric & Template & Rule-based & Local embedding LLM & Qwen-Plus & GLM-4.7-Flash & Gemini-3.1-Pro & GPT-5.5 \\
+    \midrule
+    Valid reports / requested & 100/100 & 100/100 & 100/100 & 10/10 & 10/10 & 9/9 & 100/100 \\
+    Schema valid rate & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+    Section completeness & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 0.810 \\
+    Modality support & 0.000 & 1.000 & 1.000 & 1.000 & 0.933 & 1.000 & 0.810 \\
+    Contradiction rate & 0.000 & 0.040 & 0.040 & 0.600 & 0.300 & 0.444 & 0.050 \\
+    Hallucination rate & 0.000 & 0.000 & 0.000 & 0.000 & 0.000 & 0.000 & 0.000 \\
+    Duplicate fraction & 0.860 & 0.010 & 0.010 & 0.100 & 0.100 & 0.111 & 0.190 \\
+    Alignment MRR & 0.110 & 0.102 & 0.098 & 0.318 & 0.295 & 0.366 & 0.063 \\
+    Cost per 1000 cases (USD) & 0 & 0 & 0 & -- & -- & -- & 27.73 \\
+    Latency per case (s) & -- & -- & -- & 13.68 & 25.06 & 25.70 & 11.39 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \vspace{2pt}
+  \begin{minipage}{0.98\linewidth}
+  \footnotesize Qwen-Plus, GLM-4.7-Flash, and Gemini-3.1-Pro are pilot cohorts; GPT-5.5 is the extended 100-case API cohort.
+  \end{minipage}
+\end{table*}
+
+\begin{table}[t]
+  \centering
+  \caption{Direct RASA alignment ablation using modality-section retrieval.}
+  \label{tab:theme1_alignment_ablation}
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    Model & Recall@1 & Recall@5 & Macro MRR & Positive cosine \\
+    \midrule
+    Real-report only & 0.0182 & 0.0642 & 0.057 & 0.984 \\
+    Pseudo-augmented LCAD & 0.0139 & 0.0729 & 0.055 & 0.984 \\
+    Full LCAD--RASA & 0.0148 & 0.0608 & 0.051 & 0.984 \\
+    No section alignment & 0.0052 & 0.0139 & 0.021 & 0.013 \\
+    Simple concatenation fusion & 0.0035 & 0.0182 & 0.022 & 0.021 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table*}[t]
+  \centering
+  \caption{Report-supervision scarcity curve using a lightweight downstream surrogate.}
+  \label{tab:scarcity_curve}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Setup & Real-report fraction & $n$ train & $n$ real & $n$ pseudo & AUROC & F1 \\
+    \midrule
+    LCAD-augmented surrogate & 1.00 & 1,325 & 520 & 805 & 0.838 & 0.542 \\
+    Real-report-only surrogate & 1.00 & 520 & 520 & 0 & 0.799 & 0.471 \\
+    LCAD-augmented surrogate & 0.50 & 1,065 & 260 & 805 & 0.826 & 0.526 \\
+    Real-report-only surrogate & 0.50 & 260 & 260 & 0 & 0.776 & 0.442 \\
+    LCAD-augmented surrogate & 0.25 & 935 & 130 & 805 & 0.811 & 0.485 \\
+    Real-report-only surrogate & 0.25 & 130 & 130 & 0 & 0.736 & 0.383 \\
+    LCAD-augmented surrogate & 0.10 & 857 & 52 & 805 & 0.808 & 0.500 \\
+    Real-report-only surrogate & 0.10 & 52 & 52 & 0 & 0.630 & 0.316 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Held-out test performance at validation-selected thresholds.}
+  \label{tab:main_comparison}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrr}
+    \toprule
+    Model & $n$ & AUROC [95\% CI] & F1 [95\% CI] & Threshold \\
+    \midrule
+    Full LCAD--RASA & 288 & 0.832 [0.757, 0.897] & 0.611 [0.458, 0.737] & 0.37 \\
+    LCAD w/o section alignment & 288 & 0.826 [0.749, 0.894] & 0.510 [0.381, 0.624] & 0.24 \\
+    Real-report only & 288 & 0.725 [0.640, 0.801] & 0.356 [0.263, 0.438] & 0.14 \\
+    Simple concat fusion & 288 & 0.472 [0.384, 0.563] & 0.265 [0.200, 0.326] & 0.05 \\
+    Image-only report gen. & 288 & 0.763 [0.685, 0.837] & 0.453 [0.339, 0.553] & 0.17 \\
+    Instruction-only report gen. & 288 & 0.330 [0.247, 0.417] & 0.259 [0.194, 0.319] & 0.14 \\
+    Fusion w/o report anchor & 288 & 0.802 [0.726, 0.873] & 0.457 [0.344, 0.557] & 0.16 \\
+    Pseudo-augmented (LCAD) & 288 & 0.826 [0.747, 0.894] & 0.545 [0.395, 0.674] & 0.39 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Same-split external baseline comparison on the locked held-out test set.}
+  \label{tab:external_baselines}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrr}
+    \toprule
+    Model & $n$ & AUROC [95\% CI] & F1 [95\% CI] & Threshold \\
+    \midrule
+    Full LCAD--RASA & 288 & 0.832 [0.757, 0.897] & 0.611 [0.458, 0.737] & 0.37 \\
+    Clinical-only logistic regression & 288 & 0.830 [0.760, 0.889] & 0.557 [0.430, 0.673] & 0.63 \\
+    Clinical-only gradient boosting & 288 & 0.862 [0.798, 0.918] & 0.632 [0.507, 0.741] & 0.68 \\
+    OCT-only embedding MLP & 288 & 0.786 [0.708, 0.861] & 0.494 [0.344, 0.622] & 0.68 \\
+    Colposcopy-only embedding MLP & 288 & 0.827 [0.756, 0.890] & 0.510 [0.381, 0.627] & 0.74 \\
+    Late-fusion MLP & 288 & 0.824 [0.750, 0.891] & 0.486 [0.333, 0.625] & 0.77 \\
+    Cross-attention multimodal transformer & 288 & 0.847 [0.776, 0.908] & 0.522 [0.385, 0.636] & 0.65 \\
+    CLIP-style contrastive multimodal baseline & 288 & 0.888 [0.821, 0.942] & 0.640 [0.500, 0.753] & 0.79 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \vspace{2pt}
+  \begin{minipage}{0.98\linewidth}
+  \footnotesize All baselines used the same train/validation/test split, validation max-F1 threshold, held-out test set, and bootstrap confidence-interval protocol.
+  \end{minipage}
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Corrected paired bootstrap AUROC recheck. Positive $\Delta$AUROC favours Full LCAD--RASA; negative values favour the comparator.}
+  \label{tab:paired_bootstrap_recheck}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Comparator & $n$ & Comparator AUROC & $\Delta$AUROC & 95\% interval & Two-sided $p$ \\
+    \midrule
+    LCAD w/o section alignment & 288 & 0.826 & 0.007 & [-0.016, 0.031] & 0.5570 \\
+    Real-report only & 288 & 0.724 & 0.108 & [0.056, 0.161] & 0.0005 \\
+    Simple concat fusion & 288 & 0.472 & 0.361 & [0.259, 0.466] & 0.0005 \\
+    Image-only report gen. & 288 & 0.764 & 0.069 & [0.031, 0.108] & 0.0005 \\
+    Instruction-only report gen. & 288 & 0.330 & 0.502 & [0.361, 0.626] & 0.0005 \\
+    Fusion w/o report anchor & 288 & 0.802 & 0.030 & [-0.007, 0.068] & 0.1150 \\
+    Pseudo-augmented (LCAD) & 288 & 0.826 & 0.006 & [-0.016, 0.030] & 0.5710 \\
+    Clinical-only logistic regression & 288 & 0.830 & 0.003 & [-0.070, 0.078] & 0.9090 \\
+    Clinical-only gradient boosting & 288 & 0.862 & -0.029 & [-0.114, 0.058] & 0.5380 \\
+    OCT-only embedding MLP & 288 & 0.786 & 0.046 & [-0.024, 0.115] & 0.2090 \\
+    Colposcopy-only embedding MLP & 288 & 0.827 & 0.005 & [-0.025, 0.033] & 0.7170 \\
+    Late-fusion MLP & 288 & 0.824 & 0.008 & [-0.019, 0.033] & 0.4920 \\
+    Cross-attention multimodal transformer & 288 & 0.847 & -0.015 & [-0.042, 0.011] & 0.2740 \\
+    CLIP-style contrastive multimodal baseline & 288 & 0.888 & -0.056 & [-0.092, -0.024] & 0.0020 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Upgraded perturbation sensitivity matrix. Drops are relative to normal decoding.}
+  \label{tab:perturbation_matrix}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Condition & OCT drop & Colposcopy drop & Clinical drop & Report drop & $|\Delta$risk| & Specificity hit \\
+    \midrule
+    Mask OCT & 0.743 & 0.000 & 0.000 & 0.211 & 0.053 & 1.000 \\
+    Mask Colposcopy & 0.000 & 1.000 & 0.000 & 0.177 & 0.148 & 1.000 \\
+    Mask Instruction & 0.000 & 0.000 & 0.833 & 0.179 & 0.027 & 1.000 \\
+    Shuffle OCT & 0.839 & 0.000 & 0.000 & 0.196 & 0.020 & 1.000 \\
+    Shuffle Colposcopy & 0.000 & 0.999 & 0.000 & 0.131 & 0.008 & 1.000 \\
+    Shuffle Instruction & 0.000 & 0.000 & 0.917 & 0.141 & 0.000 & 1.000 \\
+    Mask Visual & 0.743 & 1.000 & 0.000 & 0.320 & 0.313 & 1.000 \\
+    Label-only inference & 0.743 & 1.000 & 0.833 & 0.466 & 0.371 & 1.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S1. RASA alignment-weight sweep.}
+  \label{tab:s1_rasa_lambda_align_sweep}
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    $\lambda_{align}$ & AUROC & F1 & Label consistency & Section completeness \\
+    \midrule
+    0.00 & 0.766 & 0.000 & 0.641 & 1.000 \\
+    0.01 & 0.766 & 0.000 & 0.641 & 1.000 \\
+    0.05 & 0.769 & 0.000 & 0.641 & 1.000 \\
+    0.10 & 0.773 & 0.000 & 0.641 & 1.000 \\
+    0.20 & 0.776 & 0.000 & 0.641 & 1.000 \\
+    0.50 & 0.772 & 0.000 & 0.641 & 1.000 \\
+    1.00 & 0.764 & 0.000 & 0.641 & 1.000 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S2. Strict leave-one-centre-out retraining under the fixed quick-budget protocol.}
+  \label{tab:s2_loco_strict_retrain}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Held-out centre & Model & $n$ & AUROC & F1 & Sensitivity & Specificity \\
+    \midrule
+    Enshi & Full LCAD--RASA & 61 & 0.702 & 0.000 & 0.000 & 1.000 \\
+    Enshi & Real-report-only decoder & 61 & 0.617 & 0.000 & 0.000 & 1.000 \\
+    Enshi & Report generation without section alignment & 61 & 0.697 & 0.000 & 0.000 & 1.000 \\
+    Jingzhou & Full LCAD--RASA & 55 & 0.648 & 0.000 & 0.000 & 1.000 \\
+    Jingzhou & Real-report-only decoder & 55 & 0.315 & 0.000 & 0.000 & 1.000 \\
+    Jingzhou & Report generation without section alignment & 55 & 0.704 & 0.000 & 0.000 & 1.000 \\
+    Shiyan & Full LCAD--RASA & 79 & 0.500 & 0.000 & 0.000 & 1.000 \\
+    Shiyan & Real-report-only decoder & 79 & 0.500 & 0.000 & 0.000 & 1.000 \\
+    Shiyan & Report generation without section alignment & 79 & 0.500 & 0.000 & 0.000 & 1.000 \\
+    Wuhan Renmin & Full LCAD--RASA & 13 & 1.000 & 0.000 & 0.000 & 1.000 \\
+    Wuhan Renmin & Real-report-only decoder & 13 & 1.000 & 0.000 & 0.000 & 1.000 \\
+    Wuhan Renmin & Report generation without section alignment & 13 & 1.000 & 0.000 & 0.000 & 1.000 \\
+    Xiangyang & Full LCAD--RASA & 80 & 0.382 & 0.000 & 0.000 & 1.000 \\
+    Xiangyang & Real-report-only decoder & 80 & 0.382 & 0.000 & 0.000 & 1.000 \\
+    Xiangyang & Report generation without section alignment & 80 & 0.370 & 0.000 & 0.000 & 1.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S2b. Eval-only LOCO using the global checkpoint.}
+  \label{tab:s2b_loco_eval_only_global_ckpt}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    Held-out centre & Model & $n$ & AUROC & F1 & Sensitivity & Specificity & Label consistency \\
+    \midrule
+    Enshi & Real-report-only decoder & 288 & 0.809 & 0.500 & 0.374 & 0.944 & 0.741 \\
+    Enshi & Simple concatenation fusion & 288 & 0.424 & 0.480 & 1.000 & 0.000 & 0.741 \\
+    Enshi & LCAD without section alignment & 288 & 0.863 & 0.636 & 0.527 & 0.939 & 0.741 \\
+    Enshi & Full LCAD--RASA & 288 & 0.821 & 0.122 & 0.066 & 0.995 & 0.741 \\
+    Jingzhou & Real-report-only decoder & 288 & 0.830 & 0.000 & 0.000 & 1.000 & 0.587 \\
+    Jingzhou & Simple concatenation fusion & 288 & 0.652 & 0.000 & 0.000 & 1.000 & 0.587 \\
+    Jingzhou & LCAD without section alignment & 288 & 0.877 & 0.200 & 0.111 & 1.000 & 0.587 \\
+    Jingzhou & Full LCAD--RASA & 288 & 0.848 & 0.000 & 0.000 & 1.000 & 0.587 \\
+    Xiangyang & Real-report-only decoder & 288 & 0.657 & 0.071 & 0.038 & 0.996 & 0.648 \\
+    Xiangyang & Simple concatenation fusion & 288 & 0.506 & 0.000 & 0.000 & 1.000 & 0.648 \\
+    Xiangyang & LCAD without section alignment & 288 & 0.864 & 0.545 & 0.396 & 0.987 & 0.648 \\
+    Xiangyang & Full LCAD--RASA & 288 & 0.850 & 0.203 & 0.113 & 1.000 & 0.648 \\
+    Wuda & Real-report-only decoder & 89 & 0.736 & 0.159 & 0.086 & 1.000 & 0.955 \\
+    Wuda & Simple concatenation fusion & 89 & 0.548 & 0.024 & 0.012 & 1.000 & 0.955 \\
+    Wuda & LCAD without section alignment & 89 & 0.901 & 0.970 & 1.000 & 0.375 & 0.955 \\
+    Wuda & Full LCAD--RASA & 89 & 0.894 & 0.936 & 0.901 & 0.750 & 0.955 \\
+    Shiyan & Real-report-only decoder & 288 & 0.592 & 0.000 & 0.000 & 0.968 & 0.566 \\
+    Shiyan & Simple concatenation fusion & 288 & 0.444 & 0.022 & 0.250 & 0.701 & 0.566 \\
+    Shiyan & LCAD without section alignment & 288 & 0.747 & 0.400 & 0.250 & 1.000 & 0.566 \\
+    Shiyan & Full LCAD--RASA & 288 & 0.735 & 0.000 & 0.000 & 1.000 & 0.566 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \vspace{2pt}
+  \begin{minipage}{0.98\linewidth}
+  \footnotesize Eval-only LOCO is reported separately from strict LOCO retraining and is not pooled with strict LOCO results.
+  \end{minipage}
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S3. Modality ablation.}
+  \label{tab:s3_modality_ablation}
+  \small
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Variant & AUROC & F1 & Label consistency & Sensitivity & Specificity \\
+    \midrule
+    Colposcopy + clinical instruction & 0.850 & 0.524 & 0.641 & 0.614 & 0.869 \\
+    Full without fused visual embedding & 0.840 & 0.571 & 0.641 & 0.500 & 0.955 \\
+    OCT + colposcopy + clinical instruction & 0.840 & 0.571 & 0.641 & 0.500 & 0.955 \\
+    Colposcopy only & 0.838 & 0.581 & 0.641 & 0.614 & 0.910 \\
+    Full with fused visual embedding & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    OCT + colposcopy & 0.826 & 0.543 & 0.641 & 0.568 & 0.906 \\
+    OCT + clinical instruction & 0.765 & 0.466 & 0.641 & 0.386 & 0.951 \\
+    OCT only & 0.740 & 0.353 & 0.641 & 0.409 & 0.836 \\
+    Clinical instruction only & 0.683 & 0.441 & 0.641 & 0.727 & 0.717 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S4. LCAD pseudo-report quality-control ablation.}
+  \label{tab:s4_lcad_qc_ablation}
+  \small
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Variant & AUROC & F1 & Label consistency & Sensitivity & Specificity \\
+    \midrule
+    Pseudo reports, no QC & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    QC-pass pseudo reports only & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    QC-score weighting only & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    Pseudo confidence weighting only & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    QC-confidence weighted pseudo reports & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S5. RASA component ablation.}
+  \label{tab:s5_rasa_component_ablation}
+  \small
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Variant & AUROC & F1 & Label consistency & Sensitivity & Specificity \\
+    \midrule
+    Risk-head auxiliary only & 0.838 & 0.538 & 0.641 & 0.568 & 0.902 \\
+    No section alignment & 0.838 & 0.479 & 0.641 & 0.636 & 0.816 \\
+    No label-consistency loss & 0.836 & 0.579 & 0.641 & 0.500 & 0.959 \\
+    Full LCAD--RASA & 0.836 & 0.561 & 0.641 & 0.523 & 0.939 \\
+    No risk head & 0.500 & 0.265 & 0.641 & 1.000 & 0.000 \\
+    Report loss only & 0.500 & 0.265 & 0.641 & 1.000 & 0.000 \\
+    Section alignment auxiliary only & 0.500 & 0.265 & 0.641 & 1.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S7. Multi-seed stability.}
+  \label{tab:s7_multiseed_stability}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrr}
+    \toprule
+    Model & Metric & Mean & 95\% interval & SD \\
+    \midrule
+    Full LCAD--RASA & auc & 0.776 & [0.773, 0.781] & 0.004 \\
+    Full LCAD--RASA & f1 & 0.000 & [0.000, 0.000] & 0.000 \\
+    Full LCAD--RASA & label consistency & 0.641 & [0.641, 0.641] & 0.000 \\
+    Full LCAD--RASA & section completeness & 1.000 & [1.000, 1.000] & 0.000 \\
+    Full LCAD--RASA & hallucination rate & 0.000 & [0.000, 0.000] & 0.000 \\
+    Real-report-only decoder & auc & 0.667 & [0.656, 0.679] & 0.010 \\
+    Real-report-only decoder & f1 & 0.000 & [0.000, 0.000] & 0.000 \\
+    Real-report-only decoder & label consistency & 0.641 & [0.641, 0.641] & 0.000 \\
+    Real-report-only decoder & section completeness & 1.000 & [1.000, 1.000] & 0.000 \\
+    Real-report-only decoder & hallucination rate & 0.000 & [0.000, 0.000] & 0.000 \\
+    Report generation without section alignment & auc & 0.780 & [0.767, 0.795] & 0.012 \\
+    Report generation without section alignment & f1 & 0.000 & [0.000, 0.000] & 0.000 \\
+    Report generation without section alignment & label consistency & 0.641 & [0.641, 0.641] & 0.000 \\
+    Report generation without section alignment & section completeness & 1.000 & [1.000, 1.000] & 0.000 \\
+    Report generation without section alignment & hallucination rate & 0.000 & [0.000, 0.000] & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S8. LLM pseudo-report quality-control summary.}
+  \label{tab:s8_llm_pseudo_report_qc}
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    Source & $n$ & Pass rate & Source table & $n$ QC \\
+    \midrule
+    mock & 1,153 & 1.000 & mock\_vs\_llm\_qc & -- \\
+    llm & 1,153 & 1.000 & mock\_vs\_llm\_qc & -- \\
+    -- & -- & 1.000 & llm\_quality\_summary & 1,153 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S9. Report-level safety metrics.}
+  \label{tab:s9_report_safety_metrics}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Experiment & Missing-modality hallucination & Label-report contradiction & Recommendation contradiction & Section incompleteness & Any hallucination \\
+    \midrule
+    Real-report-only decoder & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    Simple concatenation fusion & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    No section alignment & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    Full LCAD--RASA & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    Pseudo reports, no QC & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    QC-confidence weighted pseudo reports & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S10. Masking validation across agent settings and centres.}
+  \label{tab:s10_masking_validation}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Setting & Centre & $n$ & Label consistency & ROUGE-L & BLEU & METEOR \\
+    \midrule
+    Label Only Agent & Enshi & 406 & 0.659 & 0.000 & 0.000 & 0.000 \\
+    Label Only Agent & Jingzhou & 334 & 0.513 & 0.000 & 0.000 & 0.000 \\
+    Label Only Agent & Xiangyang & 4 & 0.500 & 0.000 & 0.000 & 0.000 \\
+    Label Only Agent & Enshi Jingzhou Pooled & 740 & 0.593 & 0.000 & 0.000 & 0.000 \\
+    Modality Only Agent & Enshi & 406 & 0.746 & 0.002 & 0.002 & 0.002 \\
+    Modality Only Agent & Jingzhou & 334 & 0.564 & 0.000 & 0.000 & 0.000 \\
+    Modality Only Agent & Xiangyang & 4 & 0.750 & 0.000 & 0.000 & 0.000 \\
+    Modality Only Agent & Enshi Jingzhou Pooled & 740 & 0.664 & 0.000 & 0.000 & 0.000 \\
+    Modality Plus Label Agent & Enshi & 406 & 0.746 & 0.002 & 0.002 & 0.002 \\
+    Modality Plus Label Agent & Jingzhou & 334 & 0.564 & 0.000 & 0.000 & 0.000 \\
+    Modality Plus Label Agent & Xiangyang & 4 & 0.750 & 0.000 & 0.000 & 0.000 \\
+    Modality Plus Label Agent & Enshi Jingzhou Pooled & 740 & 0.664 & 0.000 & 0.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S11. Scalability and runtime summary.}
+  \label{tab:s11_scalability_runtime}
+  \scriptsize
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrr}
+    \toprule
+    Section & Metric & Value & Step \\
+    \midrule
+    pipeline\_scale & total\_cases & 1,897 & -- \\
+    pipeline\_scale & total\_centers & 5.000 & -- \\
+    pipeline\_scale & total\_images & 137,591 & -- \\
+    pipeline\_scale & total\_oct\_images & 129,030 & -- \\
+    pipeline\_scale & total\_colposcopy\_images & 8,561 & -- \\
+    pipeline\_scale & mean\_images\_per\_case & 72.531 & -- \\
+    pipeline\_scale & median\_images\_per\_case & 123 & -- \\
+    pipeline\_scale & max\_images\_per\_case & 144 & -- \\
+    pipeline\_scale & real\_report\_cases & 744 & -- \\
+    pipeline\_scale & pseudo\_report\_cases & 1,153 & -- \\
+    pipeline\_scale & missing\_report\_rate & 0.608 & -- \\
+    runtime & -- & 47.349 & embedding\_storage\_mb \\
+    runtime & embedding\_files & 5,691 & -- \\
+    runtime & -- & 79.882 & checkpoint\_publishable\_full\_lcad\_rasa\_mb \\
+    runtime & -- & 79.882 & checkpoint\_publishable\_lcad\_augmented\_mb \\
+    runtime & -- & 79.882 & checkpoint\_publishable\_dual\_real\_only\_mb \\
+    runtime & -- & 79.879 & checkpoint\_publishable\_simple\_fusion\_mb \\
+    runtime & -- & 79.879 & checkpoint\_publishable\_fusion\_plus\_section\_alignment\_mb \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table*}

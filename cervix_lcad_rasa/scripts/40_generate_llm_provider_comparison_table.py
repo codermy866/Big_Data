@@ -29,19 +29,19 @@ PROVIDER_ORDER = [
     ("aihubmix_gpt", "GPT-5.5"),
 ]
 MORANDI_HEX = [
-    "#8b98b3",
-    "#abb8cc",
-    "#dbb98c",
-    "#edd6b8",
+    "#576fa0",
+    "#a7b9d7",
+    "#e3b87f",
+    "#fadcb4",
     "#b57979",
     "#dea3a2",
-    "#b3b0b0",
-    "#d9d8d8",
+    "#9f9f9f",
+    "#cfcece",
 ]
 MORANDI = sns.color_palette(MORANDI_HEX)
 MORANDI_DIV = LinearSegmentedColormap.from_list(
-    "morandi_div",
-    ["#8b98b3", "#d9d8d8", "#b57979"],
+    "nature_div_muted",
+    ["#334a7d", "#7f98bf", "#dbe5ef", "#f7f6f0", "#e7c27f", "#c9796d", "#8b3f54"],
     N=256,
 )
 
@@ -86,6 +86,9 @@ def _setup_style() -> None:
         {
             "figure.dpi": 140,
             "savefig.dpi": 300,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
             "axes.titlesize": 18,
             "axes.titleweight": "bold",
             "axes.labelsize": 15,

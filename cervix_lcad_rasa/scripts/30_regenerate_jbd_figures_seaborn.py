@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.supplementary.jbd_figures_seaborn import generate_all_seaborn_figures
-from src.utils.config import resolve_project_root
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -21,13 +20,13 @@ def main():
     p = argparse.ArgumentParser(description="Regenerate JBD figures (Seaborn)")
     p.add_argument("--refresh-submission-v2", action="store_true", help="Copy figures into submission v2 bundle")
     args = p.parse_args()
-    project = resolve_project_root()
+    project = ROOT
     names = generate_all_seaborn_figures(project)
     logger.info("Generated %d figure groups", len(names))
     print(f"jbd_final: {project / 'outputs/publishable/figures/jbd_final'}")
     print(f"main:      {project / 'outputs/publishable/figures/main'}")
     print(f"legacy:    {project / 'outputs/publishable/figures'}")
-    print("Palette: #8b98b3 #abb8cc #dbb98c #edd6b8 #b57979 #dea3a2 #b3b0b0 #d9d8d8")
+    print("Palette: #576fa0 #a7b9d7 #e3b87f #fadcb4 #b57979 #dea3a2 #9f9f9f #cfcece")
 
     if args.refresh_submission_v2:
         import shutil

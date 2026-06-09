@@ -49,23 +49,31 @@ MODEL_VARIANTS = {
     "real_report_only": "outputs/publishable/checkpoints/publishable_dual_real_only/best.ckpt",
 }
 MORANDI_HEX = [
-    "#8b98b3",
-    "#abb8cc",
-    "#dbb98c",
-    "#edd6b8",
+    "#576fa0",
+    "#a7b9d7",
+    "#e3b87f",
+    "#fadcb4",
     "#b57979",
     "#dea3a2",
-    "#b3b0b0",
-    "#d9d8d8",
+    "#9f9f9f",
+    "#cfcece",
 ]
 MORANDI_SEQ = LinearSegmentedColormap.from_list(
-    "morandi_seq",
-    ["#d9d8d8", "#edd6b8", "#abb8cc", "#8b98b3"],
+    "nature_seq_muted",
+    [
+        "#f7f6f0",
+        "#e7e1d4",
+        "#d4bf8b",
+        "#c28b73",
+        "#a65f6f",
+        "#6f5a86",
+        "#334a7d",
+    ],
     N=256,
 )
 MORANDI_WARM = LinearSegmentedColormap.from_list(
-    "morandi_warm",
-    ["#d9d8d8", "#edd6b8", "#dea3a2", "#b57979"],
+    "nature_warm_muted",
+    ["#f7f6f0", "#e7e1d4", "#d4bf8b", "#c28b73", "#a65f6f", "#8b3f54"],
     N=256,
 )
 
@@ -77,6 +85,9 @@ def _setup_figure_style() -> None:
             "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
             "figure.dpi": 140,
             "savefig.dpi": 300,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
             "axes.titlesize": 16,
             "axes.titleweight": "bold",
             "axes.labelsize": 13,
@@ -606,23 +617,37 @@ def run_scarcity_curve(df: pd.DataFrame, paths: Paths) -> pd.DataFrame:
     _write_csv(agg, paths.tables / "T_theme1_report_supervision_scarcity_curve.csv", paths.manuscript)
 
     _setup_figure_style()
-    fig, ax = plt.subplots(figsize=(7.8, 5.0))
+    fig, ax = plt.subplots(figsize=(8.6, 5.2))
     color_map = {
         "real_report_only_surrogate": MORANDI_HEX[0],
         "lcad_augmented_surrogate": MORANDI_HEX[4],
     }
+    label_map = {
+        "real_report_only_surrogate": "Real-report only",
+        "lcad_augmented_surrogate": "LCAD-augmented",
+    }
     for setup, g in agg.groupby("setup"):
         g = g.sort_values("real_report_fraction")
         color = color_map.get(setup, MORANDI_HEX[len(color_map) % len(MORANDI_HEX)])
-        ax.plot(g["real_report_fraction"], g["auc_mean"], marker="o", label=setup, color=color, linewidth=2.4, markersize=7)
-        ax.fill_between(
+        ax.plot(
             g["real_report_fraction"],
-            g["auc_mean"] - g["auc_std"].fillna(0),
-            g["auc_mean"] + g["auc_std"].fillna(0),
-            alpha=0.15,
+            g["auc_mean"],
+            label=label_map.get(setup, setup.replace("_", " ").title()),
             color=color,
+            linewidth=1.6,
+            alpha=0.6,
         )
-    ax.set_xscale("log")
+        ax.scatter(g["real_report_fraction"], g["auc_mean"], color=color, edgecolor="#3a3a3a", linewidth=0.8, s=82, zorder=3)
+        ax.errorbar(
+            g["real_report_fraction"],
+            g["auc_mean"],
+            yerr=g["auc_std"].fillna(0),
+            fmt="none",
+            ecolor="#3a3a3a",
+            elinewidth=1.0,
+            capsize=3,
+            zorder=2,
+        )
     ax.set_xticks([0.1, 0.25, 0.5, 1.0])
     ax.set_xticklabels(["10%", "25%", "50%", "100%"])
     ax.set_xlabel("Available real-report supervision fraction")

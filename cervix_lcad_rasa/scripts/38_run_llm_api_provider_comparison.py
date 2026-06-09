@@ -65,6 +65,75 @@ API_PROVIDERS = [
     "aihubmix_mimo",
 ]
 BASELINE_PROVIDERS = ["label_template", "rule_based", "local_llm"]
+MORANDI_HEX = [
+    "#576fa0",
+    "#a7b9d7",
+    "#e3b87f",
+    "#fadcb4",
+    "#b57979",
+    "#dea3a2",
+    "#9f9f9f",
+    "#cfcece",
+]
+TEXT_DARK = "#3a3a3a"
+EDGE_DARK = "#9f9f9f"
+GRID_LINE = "#cfcece"
+PROVIDER_LABELS = {
+    "label_template": "Template",
+    "rule_based": "Rule-based",
+    "local_llm": "Local embedding LLM",
+    "qwen": "Qwen",
+    "glm": "GLM",
+    "gemini": "Gemini",
+    "gpt": "GPT",
+    "minimax": "MiniMax",
+    "aihubmix": "API model",
+    "aihubmix_gpt": "GPT-5.5",
+    "aihubmix_qwen": "Qwen-Plus",
+    "aihubmix_glm": "GLM-4.7-Flash",
+    "aihubmix_gemini": "Gemini-3.1-Pro",
+    "aihubmix_deepseek": "DeepSeek-V4-Pro",
+    "aihubmix_llama": "Llama-4",
+    "aihubmix_mimo": "Xiaomi-MiMo-V2.5",
+}
+
+
+def _setup_plot_style() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "Arial",
+            "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
+            "axes.titleweight": "bold",
+            "axes.labelweight": "bold",
+            "axes.titlesize": 17,
+            "axes.labelsize": 14,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12,
+            "legend.fontsize": 11,
+            "legend.title_fontsize": 12,
+            "axes.edgecolor": EDGE_DARK,
+            "axes.labelcolor": TEXT_DARK,
+            "text.color": TEXT_DARK,
+            "grid.color": GRID_LINE,
+            "grid.alpha": 0.45,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
+
+
+def _provider_label(provider: Any) -> str:
+    label = PROVIDER_LABELS.get(str(provider), str(provider).replace("_", " ").title())
+    for token in ("AIHubMix", "aihubmix", "Free", "free", "Preview", "preview"):
+        label = label.replace(token, "").strip()
+    return re.sub(r"\s+", " ", label)
+
+
+def _save_plot(fig: plt.Figure, out_base: Path) -> None:
+    out_base.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_base.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white")
+    fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight", facecolor="white")
+    plt.close(fig)
 
 
 def _safe_str(x: Any) -> str:
@@ -671,23 +740,41 @@ def _plot_quality(agg: pd.DataFrame, out_base: Path) -> None:
     plot = agg[pd.to_numeric(agg.get("n_cases", 0), errors="coerce").fillna(0) > 0].copy()
     if plot.empty:
         return
+    _setup_plot_style()
+    plot["display_provider"] = plot["provider"].map(_provider_label)
     metrics = ["schema_valid_rate", "section_completeness", "mean_modality_support_rate", "qc_pass_rate"]
-    fig, ax = plt.subplots(figsize=(9, 4.8))
+    metric_labels = {
+        "schema_valid_rate": "Schema valid",
+        "section_completeness": "Section complete",
+        "mean_modality_support_rate": "Modality support",
+        "qc_pass_rate": "QC pass",
+    }
+    fig, ax = plt.subplots(figsize=(10.5, 5.2))
     x = np.arange(len(plot))
     width = 0.18
     for i, metric in enumerate(metrics):
-        ax.bar(x + (i - 1.5) * width, plot[metric].astype(float), width=width, label=metric)
+        xpos = x + (i - 1.5) * width
+        ax.bar(
+            xpos,
+            plot[metric].astype(float),
+            width=width,
+            label=metric_labels.get(metric, metric),
+            color=MORANDI_HEX[i],
+            edgecolor=EDGE_DARK,
+            linewidth=0.8,
+            alpha=0.86,
+            zorder=1,
+        )
+        ax.scatter(xpos, plot[metric].astype(float), marker="s", s=28, color=MORANDI_HEX[(i + 4) % len(MORANDI_HEX)], edgecolor=TEXT_DARK, linewidth=0.6, zorder=3)
     ax.set_xticks(x)
-    ax.set_xticklabels(plot["provider"], rotation=25, ha="right")
+    ax.set_xticklabels(plot["display_provider"], rotation=25, ha="right")
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("Rate")
-    ax.set_title("LLM provider pseudo-report quality comparison")
-    ax.legend(frameon=False, ncol=2)
+    ax.set_title("Structured pseudo-report quality by model")
+    ax.grid(axis="y")
+    ax.legend(frameon=False, ncol=1, title="Metric", bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.tight_layout()
-    out_base.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_base.with_suffix(".png"), dpi=300, bbox_inches="tight")
-    fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight")
-    plt.close(fig)
+    _save_plot(fig, out_base)
 
 
 def build_provider_manifests(
@@ -849,16 +936,23 @@ def _plot_alignment(macro: pd.DataFrame, out_base: Path) -> None:
     if macro.empty or "macro_mrr" not in macro.columns:
         return
     plot = macro.copy()
-    fig, ax = plt.subplots(figsize=(7.5, 4.5))
-    ax.bar(plot["provider"], plot["macro_mrr"].astype(float), color="#4C78A8")
+    _setup_plot_style()
+    plot["display_provider"] = plot["provider"].map(_provider_label)
+    plot = plot.sort_values("macro_mrr", ascending=True)
+    fig, ax = plt.subplots(figsize=(7.8, 4.8))
+    y = np.arange(len(plot))
+    colors = [MORANDI_HEX[i % len(MORANDI_HEX)] for i in range(len(plot))]
+    ax.barh(y, plot["macro_mrr"].astype(float), color=colors, edgecolor=EDGE_DARK, linewidth=0.9, alpha=0.86, zorder=1)
+    ax.scatter(plot["macro_mrr"].astype(float), y, marker="D", s=46, color=MORANDI_HEX[4], edgecolor=TEXT_DARK, linewidth=0.7, zorder=3)
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot["display_provider"])
     ax.set_ylabel("Macro MRR")
-    ax.set_title("Provider pseudo-report modality-section alignment")
-    ax.tick_params(axis="x", rotation=25)
+    ax.set_xlabel("Macro MRR")
+    ax.set_ylabel("")
+    ax.set_title("Modality-section alignment by model")
+    ax.grid(axis="x")
     fig.tight_layout()
-    out_base.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_base.with_suffix(".png"), dpi=300, bbox_inches="tight")
-    fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight")
-    plt.close(fig)
+    _save_plot(fig, out_base)
 
 
 def rank_providers(quality: pd.DataFrame, alignment: pd.DataFrame, paths: dict[str, Path]) -> pd.DataFrame:
@@ -900,18 +994,24 @@ def _plot_ranking(ranking: pd.DataFrame, out_base: Path) -> None:
     plot = ranking[pd.to_numeric(ranking["composite_score"], errors="coerce").notna()].copy()
     if plot.empty:
         return
-    fig, ax = plt.subplots(figsize=(7.5, 4.5))
-    colors = ["#59A14F" if p in API_PROVIDERS else "#9C755F" for p in plot["provider"]]
-    ax.bar(plot["provider"], plot["composite_score"].astype(float), color=colors)
-    ax.set_ylim(0, 1.05)
-    ax.set_ylabel("Composite selection score")
-    ax.set_title("Candidate provider ranking for downstream experiment")
-    ax.tick_params(axis="x", rotation=25)
+    _setup_plot_style()
+    plot["display_provider"] = plot["provider"].map(_provider_label)
+    plot = plot.sort_values("composite_score", ascending=True)
+    fig, ax = plt.subplots(figsize=(7.8, 4.8))
+    y = np.arange(len(plot))
+    colors = [MORANDI_HEX[0] if p in API_PROVIDERS else MORANDI_HEX[6] for p in plot["provider"]]
+    ax.hlines(y, 0, plot["composite_score"].astype(float), color=GRID_LINE, linewidth=6, alpha=0.8)
+    ax.scatter(plot["composite_score"].astype(float), y, color=colors, edgecolor=TEXT_DARK, linewidth=0.8, s=90, marker="o", zorder=3)
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot["display_provider"])
+    ax.set_ylim(-0.6, len(plot) - 0.4)
+    ax.set_xlim(0, 1.05)
+    ax.set_xlabel("Composite selection score")
+    ax.set_ylabel("")
+    ax.set_title("Candidate model ranking for downstream experiment")
+    ax.grid(axis="x")
     fig.tight_layout()
-    out_base.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_base.with_suffix(".png"), dpi=300, bbox_inches="tight")
-    fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight")
-    plt.close(fig)
+    _save_plot(fig, out_base)
 
 
 def _dense_features(df: pd.DataFrame) -> np.ndarray:
@@ -1072,28 +1172,29 @@ def run_downstream_scarcity(
 def _plot_scarcity(out: pd.DataFrame, out_base: Path) -> None:
     if out.empty or "auc_mean" not in out.columns:
         return
-    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+    _setup_plot_style()
+    fig, ax = plt.subplots(figsize=(8.8, 5.2))
+    providers = list(out["provider"].drop_duplicates())
+    palette = {p: MORANDI_HEX[i % len(MORANDI_HEX)] for i, p in enumerate(providers)}
+    offsets = np.linspace(-0.025, 0.025, max(1, len(providers)))
+    off_map = {p: offsets[i] for i, p in enumerate(providers)}
     for provider, g in out.groupby("provider"):
         g = g.sort_values("real_report_fraction")
-        ax.plot(g["real_report_fraction"], g["auc_mean"], marker="o", label=provider)
-        ax.fill_between(
-            g["real_report_fraction"],
-            g["auc_mean"] - g["auc_std"].fillna(0),
-            g["auc_mean"] + g["auc_std"].fillna(0),
-            alpha=0.15,
-        )
+        xs = g["real_report_fraction"].astype(float) + off_map[provider]
+        ax.plot(xs, g["auc_mean"], color=palette[provider], linewidth=1.4, alpha=0.82)
+        ax.scatter(xs, g["auc_mean"], marker="o", s=78, color=palette[provider], edgecolor=TEXT_DARK, linewidth=0.8, label=_provider_label(provider), zorder=3)
+        if "auc_std" in g.columns:
+            ax.errorbar(xs, g["auc_mean"], yerr=g["auc_std"].fillna(0), fmt="none", ecolor=TEXT_DARK, elinewidth=1.0, capsize=3, zorder=2)
     ax.set_xscale("log")
     ax.set_xticks([0.1, 0.25, 0.5, 1.0])
     ax.set_xticklabels(["10%", "25%", "50%", "100%"])
     ax.set_xlabel("Available real-report supervision fraction")
     ax.set_ylabel("AUROC on locked test set")
-    ax.set_title("Top API-provider report-supervision scarcity surrogate")
-    ax.legend(frameon=False)
+    ax.set_title("Report-supervision scarcity surrogate")
+    ax.grid(axis="y")
+    ax.legend(frameon=False, title="Model")
     fig.tight_layout()
-    out_base.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_base.with_suffix(".png"), dpi=300, bbox_inches="tight")
-    fig.savefig(out_base.with_suffix(".pdf"), bbox_inches="tight")
-    plt.close(fig)
+    _save_plot(fig, out_base)
 
 
 def write_summary(
@@ -1108,7 +1209,7 @@ def write_summary(
     summary = paths["out"] / "LLM_API_PROVIDER_COMPARISON_SUMMARY.md"
     lines = [
         "# LLM API Provider Comparison Summary\n\n",
-        "Scope: Qwen/GLM/Gemini/GPT/MiniMax/AIHubMix structured pseudo-report generation, QC, semantic alignment, and downstream scarcity surrogate.\n\n",
+        "Scope: Qwen/GLM/Gemini/GPT/MiniMax structured pseudo-report generation, QC, semantic alignment, and downstream scarcity surrogate.\n\n",
         "## Configuration\n\n",
         f"- sample_size: `{args.sample_size}`\n",
         f"- split: `{args.split}`\n",

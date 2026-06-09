@@ -36,24 +36,32 @@ PROVIDER_LABELS = {
     "aihubmix_gemini": "Gemini-3.1-Pro",
 }
 MORANDI_HEX = [
-    "#8b98b3",
-    "#abb8cc",
-    "#dbb98c",
-    "#edd6b8",
+    "#576fa0",
+    "#a7b9d7",
+    "#e3b87f",
+    "#fadcb4",
     "#b57979",
     "#dea3a2",
-    "#b3b0b0",
-    "#d9d8d8",
+    "#9f9f9f",
+    "#cfcece",
 ]
 MORANDI = sns.color_palette(MORANDI_HEX)
 MORANDI_SEQ = LinearSegmentedColormap.from_list(
-    "morandi_seq",
-    ["#d9d8d8", "#edd6b8", "#abb8cc", "#8b98b3"],
+    "nature_seq_muted",
+    [
+        "#f7f6f0",
+        "#e7e1d4",
+        "#d4bf8b",
+        "#c28b73",
+        "#a65f6f",
+        "#6f5a86",
+        "#334a7d",
+    ],
     N=256,
 )
 MORANDI_DIV = LinearSegmentedColormap.from_list(
-    "morandi_div",
-    ["#8b98b3", "#d9d8d8", "#b57979"],
+    "nature_div_muted",
+    ["#334a7d", "#7f98bf", "#dbe5ef", "#f7f6f0", "#e7c27f", "#c9796d", "#8b3f54"],
     N=256,
 )
 
@@ -260,6 +268,9 @@ def _setup_style() -> None:
         {
             "figure.dpi": 140,
             "savefig.dpi": 300,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
             "axes.spines.top": False,
             "axes.spines.right": False,
             "axes.grid": True,
@@ -363,51 +374,128 @@ def _plot_quality(quality: pd.DataFrame) -> None:
             "max_duplicate_fraction": "Duplicate fraction",
         }
     )
-    fig, ax = plt.subplots(figsize=(10.2, 6.4))
-    sns.scatterplot(
+    fig, ax = plt.subplots(figsize=(12.2, 6.2))
+    sns.barplot(
         data=long,
-        x="rate",
-        y="provider_label",
+        x="provider_label",
+        y="rate",
         hue="risk_metric",
-        style="risk_metric",
         palette=[MORANDI_HEX[4], MORANDI_HEX[2]],
-        s=210,
         edgecolor="0.25",
         linewidth=0.9,
+        alpha=0.86,
         ax=ax,
     )
-    for y, row in enumerate(plot["provider_label"]):
-        vals = long[long["provider_label"].eq(row)]["rate"].astype(float).tolist()
-        if vals:
-            ax.hlines(y, min(vals), max(vals), color=MORANDI_HEX[6], linewidth=2.0, alpha=0.55, zorder=0)
-    ax.set_xlim(0, 1)
-    ax.set_xlabel("Rate")
-    ax.set_ylabel("")
+    sns.stripplot(
+        data=long,
+        x="provider_label",
+        y="rate",
+        hue="risk_metric",
+        dodge=True,
+        marker="s",
+        size=7,
+        edgecolor="0.25",
+        linewidth=0.8,
+        palette=[MORANDI_HEX[4], MORANDI_HEX[2]],
+        ax=ax,
+        legend=False,
+    )
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Rate")
+    ax.set_xlabel("")
     ax.set_title("Clinical consistency and repetition risk")
+    ax.tick_params(axis="x", rotation=25)
     ax.legend(frameon=False, title="Metric")
     _polish_axes(ax, legend=True)
     _save(fig, "P2_stage1_quality_risk_bars")
 
     api = plot[plot["provider"].isin(API_PROVIDERS)].dropna(subset=["mean_latency_seconds"])
     if not api.empty:
+        api = api.sort_values("mean_latency_seconds").copy()
+        tokens = api["mean_completion_tokens"].astype(float)
+        token_min = float(tokens.min())
+        token_max = float(tokens.max())
+
+        def _bubble_size(value: float) -> float:
+            if not np.isfinite(value) or token_max <= token_min:
+                return 360.0
+            return 180.0 + 520.0 * ((value - token_min) / (token_max - token_min))
+
+        provider_colors = {
+            "aihubmix_gpt": MORANDI_HEX[4],
+            "aihubmix_qwen": MORANDI_HEX[0],
+            "aihubmix_glm": MORANDI_HEX[2],
+            "aihubmix_gemini": MORANDI_HEX[1],
+        }
+        label_offsets = {
+            "GPT-5.5": (12, -4),
+            "Qwen-Plus": (12, -18),
+            "GLM-4.7-Flash": (-122, -18),
+            "Gemini-3.1-Pro": (-132, 12),
+        }
+
         fig, ax = plt.subplots(figsize=(9.8, 5.8))
-        sns.scatterplot(
-            data=api,
-            x="mean_latency_seconds",
-            y="mean_modality_support_rate",
-            hue="provider_label",
-            size="mean_completion_tokens",
-            sizes=(120, 520),
-            palette=MORANDI_HEX[: max(3, len(api))],
-            edgecolor="white",
-            linewidth=1.2,
-            ax=ax,
-        )
-        ax.set_xlabel("Latency per case (s)")
+        for _, row in api.iterrows():
+            x = float(row["mean_latency_seconds"])
+            y = float(row["mean_modality_support_rate"])
+            model = str(row["provider_label"])
+            n_cases = int(row["n_cases"]) if pd.notna(row.get("n_cases", np.nan)) else 0
+            color = provider_colors.get(str(row["provider"]), MORANDI_HEX[6])
+            size = _bubble_size(float(row["mean_completion_tokens"]))
+            ax.scatter(
+                x,
+                y,
+                s=size,
+                color=color,
+                edgecolor="#343434",
+                linewidth=0.9,
+                alpha=0.92,
+                zorder=3,
+            )
+            dx, dy = label_offsets.get(model, (10, 10))
+            ax.annotate(
+                f"{model}\n(n={n_cases})",
+                xy=(x, y),
+                xytext=(dx, dy),
+                textcoords="offset points",
+                ha="left" if dx >= 0 else "right",
+                va="center",
+                fontsize=11.5,
+                fontweight="bold",
+                color="#2f2f2f",
+                bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.86),
+                arrowprops=dict(arrowstyle="-", color="#666666", lw=0.8, alpha=0.75),
+                zorder=4,
+            )
+
+        if token_max > token_min:
+            legend_values = np.unique(np.round(np.linspace(token_min, token_max, 3) / 100) * 100).astype(int)
+            handles = [
+                ax.scatter(
+                    [],
+                    [],
+                    s=_bubble_size(float(v)),
+                    color=MORANDI_HEX[6],
+                    edgecolor="#343434",
+                    linewidth=0.8,
+                    alpha=0.82,
+                )
+                for v in legend_values
+            ]
+            ax.legend(
+                handles,
+                [f"{v:,}" for v in legend_values],
+                title="Completion tokens",
+                frameon=False,
+                loc="lower right",
+            )
+        ax.set_xlabel("Mean latency per case (s)")
         ax.set_ylabel("Modality support rate")
-        ax.set_ylim(0, 1.05)
-        ax.set_title("Generation latency versus modality support")
-        ax.legend(frameon=False, title="Model", bbox_to_anchor=(1.02, 1), loc="upper left")
+        x_pad = max(0.8, (api["mean_latency_seconds"].max() - api["mean_latency_seconds"].min()) * 0.08)
+        ax.set_xlim(api["mean_latency_seconds"].min() - x_pad, api["mean_latency_seconds"].max() + x_pad)
+        ax.set_ylim(0.76, 1.035)
+        ax.axhline(1.0, color="#666666", lw=1.0, ls=":", alpha=0.65, zorder=1)
+        ax.set_title("Latency and modality support of API-generated pseudo reports")
         _polish_axes(ax, legend=True)
         _save(fig, "P3_stage1_latency_support_scatter")
 
@@ -517,30 +605,28 @@ def _plot_alignment(macro: pd.DataFrame, section: pd.DataFrame) -> None:
 def _plot_scarcity(scarcity: pd.DataFrame) -> None:
     if scarcity.empty or "auc_mean" not in scarcity.columns:
         return
-    fig, ax = plt.subplots(figsize=(10.2, 5.8))
-    sns.lineplot(
-        data=scarcity.sort_values("real_report_fraction"),
-        x="real_report_fraction",
-        y="auc_mean",
-        hue="provider_label",
-        marker="o",
-        markersize=8,
-        linewidth=2.4,
-        palette=MORANDI_HEX[: scarcity["provider_label"].nunique()],
-        ax=ax,
-    )
-    for _, row in scarcity.iterrows():
+    fig, ax = plt.subplots(figsize=(11.0, 5.8))
+    plot = scarcity.sort_values(["real_report_fraction", "provider_label"]).copy()
+    palette = {p: MORANDI_HEX[i % len(MORANDI_HEX)] for i, p in enumerate(plot["provider_label"].drop_duplicates())}
+    x_levels = sorted(plot["real_report_fraction"].unique())
+    offsets = np.linspace(-0.035, 0.035, max(1, plot["provider_label"].nunique()))
+    off_map = {p: offsets[i] for i, p in enumerate(plot["provider_label"].drop_duplicates())}
+    for provider, g in plot.groupby("provider_label"):
+        xs = g["real_report_fraction"].astype(float) + off_map[provider]
+        ax.plot(xs, g["auc_mean"], color=palette[provider], linewidth=1.5, alpha=0.86)
+        ax.scatter(xs, g["auc_mean"], s=86, marker="o", color=palette[provider], edgecolor="0.25", linewidth=0.8, label=provider, zorder=3)
+    for _, row in plot.iterrows():
         if pd.notna(row.get("auc_std", np.nan)):
+            xval = float(row["real_report_fraction"]) + off_map[row["provider_label"]]
             ax.errorbar(
-                row["real_report_fraction"],
+                xval,
                 row["auc_mean"],
                 yerr=row["auc_std"],
                 fmt="none",
-                ecolor=MORANDI_HEX[6],
+                ecolor="0.25",
                 elinewidth=1.0,
                 capsize=3,
             )
-    ax.set_xscale("log")
     ax.set_xticks([0.1, 0.25, 0.5, 1.0])
     ax.set_xticklabels(["10%", "25%", "50%", "100%"])
     ax.set_xlabel("Available real-report supervision")

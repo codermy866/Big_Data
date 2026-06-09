@@ -1,0 +1,597 @@
+% Polished SCI-style LaTeX tables for the Experiments and Results section.
+% Required packages in the preamble:
+% \usepackage{booktabs,multirow,makecell,threeparttable,graphicx,arydshln}
+% \setlength{\dashlinedash}{0.45pt}
+% \setlength{\dashlinegap}{2.2pt}
+% \newcommand{\NA}{\textemdash}
+\setlength{\dashlinedash}{0.45pt}
+\setlength{\dashlinegap}{2.2pt}
+\providecommand{\NA}{\textemdash}
+
+\begin{table*}[t]
+  \centering
+  \caption{Structured pseudo-report source comparison.}
+  \label{tab:pseudo_source_comparison}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    \textbf{Source} & \textbf{$n$} & \textbf{Label consistency} & \textbf{Modality support} & \textbf{Unique text} & \textbf{Duplicate fraction} \\
+    \midrule
+    Label template       & 180 & 0.567 & 0.000 & 0.011 & 0.867 \\
+    \hdashline
+    Rule-based           & 180 & 0.628 & 1.000 & 0.194 & 0.200 \\
+    Local embedding LLM  & 180 & 0.628 & 1.000 & 0.156 & 0.261 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All three sources produced schema-complete reports (complete rate = 1.000). The complete-rate column was therefore removed to avoid a non-informative duplicate column.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{LLM provider comparison for structured pseudo-report generation.}
+  \label{tab:llm_provider_comparison}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    \textbf{Source} & \textbf{Valid/requested} & \textbf{Section completeness} & \textbf{Modality support} & \textbf{Contradiction rate} & \textbf{Duplicate fraction} & \textbf{Alignment MRR} & \textbf{Latency (s)} \\
+    \midrule
+    Template              & 100/100 & 1.000 & 0.000 & 0.000 & 0.860 & 0.110 & \NA \\
+    Rule-based            & 100/100 & 1.000 & 1.000 & 0.040 & 0.010 & 0.102 & \NA \\
+    Local embedding LLM   & 100/100 & 1.000 & 1.000 & 0.040 & 0.010 & 0.098 & \NA \\
+    \hdashline
+    Qwen-Plus             & 10/10   & 1.000 & 1.000 & 0.600 & 0.100 & 0.318 & 13.68 \\
+    GLM-4.7-Flash         & 10/10   & 1.000 & 0.933 & 0.300 & 0.100 & 0.295 & 25.06 \\
+    Gemini-3.1-Pro        & 9/9     & 1.000 & 1.000 & 0.444 & 0.111 & 0.366 & 25.70 \\
+    GPT-5.5               & 100/100 & 0.810 & 0.810 & 0.050 & 0.190 & 0.063 & 11.39 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Schema-valid rate was 1.000 and hallucination rate was 0.000 for all evaluated sources; these non-informative duplicate rows were omitted from the body of the table. Latency was measured only for API providers. GPT-5.5 had an estimated cost of US\$27.73 per 1,000 cases. Qwen-Plus, GLM-4.7-Flash, and Gemini-3.1-Pro were pilot cohorts; GPT-5.5 was the extended 100-case API cohort.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table}[t]
+  \centering
+  \caption{Direct RASA alignment ablation using modality-section retrieval.}
+  \label{tab:theme1_alignment_ablation}
+  \small
+  \begin{threeparttable}
+  \begin{tabular}{lrrrr}
+    \toprule
+    \textbf{Model} & \textbf{Recall@1} & \textbf{Recall@5} & \textbf{Macro MRR} & \textbf{Positive cosine} \\
+    \midrule
+    Real-report only            & 0.0182 & 0.0642 & 0.057 & 0.984 \\
+    Pseudo-augmented LCAD       & 0.0139 & 0.0729 & 0.055 & 0.984 \\
+    Full LCAD--RASA             & 0.0148 & 0.0608 & 0.051 & 0.984 \\
+    \hdashline
+    No section alignment        & 0.0052 & 0.0139 & 0.021 & 0.013 \\
+    Simple concatenation fusion & 0.0035 & 0.0182 & 0.022 & 0.021 \\
+    \bottomrule
+  \end{tabular}
+  \end{threeparttable}
+\end{table}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Report-supervision scarcity curve using a lightweight downstream surrogate.}
+  \label{tab:scarcity_curve}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{llrrrrr}
+    \toprule
+    \textbf{Real-report fraction} & \textbf{Setup} & \textbf{$n$ train} & \textbf{$n$ real} & \textbf{$n$ pseudo} & \textbf{AUROC} & \textbf{F1} \\
+    \midrule
+    \multirow{2}{*}{1.00} & LCAD-augmented surrogate  & 1,325 & 520 & 805 & 0.838 & 0.542 \\
+                          & Real-report-only surrogate & 520   & 520 & 0   & 0.799 & 0.471 \\
+    \hdashline
+    \multirow{2}{*}{0.50} & LCAD-augmented surrogate  & 1,065 & 260 & 805 & 0.826 & 0.526 \\
+                          & Real-report-only surrogate & 260   & 260 & 0   & 0.776 & 0.442 \\
+    \hdashline
+    \multirow{2}{*}{0.25} & LCAD-augmented surrogate  & 935   & 130 & 805 & 0.811 & 0.485 \\
+                          & Real-report-only surrogate & 130   & 130 & 0   & 0.736 & 0.383 \\
+    \hdashline
+    \multirow{2}{*}{0.10} & LCAD-augmented surrogate  & 857   & 52  & 805 & 0.808 & 0.500 \\
+                          & Real-report-only surrogate & 52    & 52  & 0   & 0.630 & 0.316 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Held-out test performance at validation-selected thresholds.}
+  \label{tab:main_comparison}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrr}
+    \toprule
+    \textbf{Model} & \textbf{AUROC [95\% CI]} & \textbf{F1 [95\% CI]} & \textbf{Threshold} \\
+    \midrule
+    \textbf{Full LCAD--RASA}       & \textbf{0.832 [0.757, 0.897]} & \textbf{0.611 [0.458, 0.737]} & \textbf{0.37} \\
+    \hdashline
+    LCAD w/o section alignment     & 0.826 [0.749, 0.894] & 0.510 [0.381, 0.624] & 0.24 \\
+    Pseudo-augmented LCAD          & 0.826 [0.747, 0.894] & 0.545 [0.395, 0.674] & 0.39 \\
+    Fusion w/o report anchor       & 0.802 [0.726, 0.873] & 0.457 [0.344, 0.557] & 0.16 \\
+    Image-only report generator    & 0.763 [0.685, 0.837] & 0.453 [0.339, 0.553] & 0.17 \\
+    Real-report only               & 0.725 [0.640, 0.801] & 0.356 [0.263, 0.438] & 0.14 \\
+    Simple concatenation fusion    & 0.472 [0.384, 0.563] & 0.265 [0.200, 0.326] & 0.05 \\
+    Instruction-only report generator & 0.330 [0.247, 0.417] & 0.259 [0.194, 0.319] & 0.14 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All models were evaluated on the same locked held-out test set ($n=288$). The repeated $n$ column was removed and reported here.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Same-split external baseline comparison on the locked held-out test set.}
+  \label{tab:external_baselines}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrr}
+    \toprule
+    \textbf{Model} & \textbf{AUROC [95\% CI]} & \textbf{F1 [95\% CI]} & \textbf{Threshold} \\
+    \midrule
+    CLIP-style contrastive multimodal baseline & 0.888 [0.821, 0.942] & 0.640 [0.500, 0.753] & 0.79 \\
+    Clinical-only gradient boosting            & 0.862 [0.798, 0.918] & 0.632 [0.507, 0.741] & 0.68 \\
+    Cross-attention multimodal transformer     & 0.847 [0.776, 0.908] & 0.522 [0.385, 0.636] & 0.65 \\
+    \hdashline
+    \textbf{Full LCAD--RASA}                   & \textbf{0.832 [0.757, 0.897]} & \textbf{0.611 [0.458, 0.737]} & \textbf{0.37} \\
+    \hdashline
+    Clinical-only logistic regression          & 0.830 [0.760, 0.889] & 0.557 [0.430, 0.673] & 0.63 \\
+    Colposcopy-only embedding MLP              & 0.827 [0.756, 0.890] & 0.510 [0.381, 0.627] & 0.74 \\
+    Late-fusion MLP                            & 0.824 [0.750, 0.891] & 0.486 [0.333, 0.625] & 0.77 \\
+    OCT-only embedding MLP                     & 0.786 [0.708, 0.861] & 0.494 [0.344, 0.622] & 0.68 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All baselines used the same train/validation/test split, validation max-F1 threshold, held-out test set, and bootstrap confidence-interval protocol ($n=288$). The repeated $n$ column was removed.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Corrected paired bootstrap AUROC recheck. Positive $\Delta$AUROC favours Full LCAD--RASA; negative values favour the comparator.}
+  \label{tab:paired_bootstrap_recheck}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{llrrrr}
+    \toprule
+    \textbf{Group} & \textbf{Comparator} & \textbf{Comparator AUROC} & \textbf{$\Delta$AUROC} & \textbf{95\% interval} & \textbf{Two-sided $p$} \\
+    \midrule
+    \multirow{7}{*}{Internal}
+      & LCAD w/o section alignment      & 0.826 & 0.007  & [-0.016, 0.031] & 0.5570 \\
+      & Real-report only                & 0.724 & 0.108  & [0.056, 0.161]  & 0.0005 \\
+      & Simple concat fusion            & 0.472 & 0.361  & [0.259, 0.466]  & 0.0005 \\
+      & Image-only report generator     & 0.764 & 0.069  & [0.031, 0.108]  & 0.0005 \\
+      & Instruction-only report generator & 0.330 & 0.502 & [0.361, 0.626]  & 0.0005 \\
+      & Fusion w/o report anchor        & 0.802 & 0.030  & [-0.007, 0.068] & 0.1150 \\
+      & Pseudo-augmented LCAD           & 0.826 & 0.006  & [-0.016, 0.030] & 0.5710 \\
+    \hdashline
+    \multirow{7}{*}{External}
+      & Clinical-only logistic regression      & 0.830 & 0.003  & [-0.070, 0.078] & 0.9090 \\
+      & Clinical-only gradient boosting        & 0.862 & -0.029 & [-0.114, 0.058] & 0.5380 \\
+      & OCT-only embedding MLP                 & 0.786 & 0.046  & [-0.024, 0.115] & 0.2090 \\
+      & Colposcopy-only embedding MLP          & 0.827 & 0.005  & [-0.025, 0.033] & 0.7170 \\
+      & Late-fusion MLP                        & 0.824 & 0.008  & [-0.019, 0.033] & 0.4920 \\
+      & Cross-attention multimodal transformer & 0.847 & -0.015 & [-0.042, 0.011] & 0.2740 \\
+      & CLIP-style contrastive multimodal baseline & 0.888 & -0.056 & [-0.092, -0.024] & 0.0020 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All comparisons used the same held-out test set ($n=288$). The repeated $n$ column was removed and internal/external comparators were grouped for readability.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Upgraded perturbation sensitivity matrix. Drops are relative to normal decoding.}
+  \label{tab:perturbation_matrix}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    \textbf{Condition} & \textbf{OCT drop} & \textbf{Colposcopy drop} & \textbf{Clinical drop} & \textbf{Report drop} & \textbf{$|\Delta$risk|} \\
+    \midrule
+    Mask OCT            & 0.743 & 0.000 & 0.000 & 0.211 & 0.053 \\
+    Shuffle OCT         & 0.839 & 0.000 & 0.000 & 0.196 & 0.020 \\
+    \hdashline
+    Mask Colposcopy     & 0.000 & 1.000 & 0.000 & 0.177 & 0.148 \\
+    Shuffle Colposcopy  & 0.000 & 0.999 & 0.000 & 0.131 & 0.008 \\
+    \hdashline
+    Mask Instruction    & 0.000 & 0.000 & 0.833 & 0.179 & 0.027 \\
+    Shuffle Instruction & 0.000 & 0.000 & 0.917 & 0.141 & 0.000 \\
+    \hdashline
+    Mask Visual         & 0.743 & 1.000 & 0.000 & 0.320 & 0.313 \\
+    Label-only inference & 0.743 & 1.000 & 0.833 & 0.466 & 0.371 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Specificity hit was 1.000 for every perturbation condition and was removed as a non-informative duplicate column.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S1. RASA alignment-weight sweep.}
+  \label{tab:s1_rasa_lambda_align_sweep}
+  \small
+  \begin{threeparttable}
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{$\lambda_{\mathrm{align}}$} & \textbf{AUROC} \\
+    \midrule
+    0.00 & 0.766 \\
+    0.01 & 0.766 \\
+    0.05 & 0.769 \\
+    0.10 & 0.773 \\
+    0.20 & 0.776 \\
+    0.50 & 0.772 \\
+    1.00 & 0.764 \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item F1 was 0.000, label consistency was 0.641, and section completeness was 1.000 for all settings; these constant columns were omitted.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S2. Strict leave-one-centre-out retraining under the fixed quick-budget protocol.}
+  \label{tab:s2_loco_strict_retrain}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{llrr}
+    \toprule
+    \textbf{Held-out centre} & \textbf{Model} & \textbf{$n$} & \textbf{AUROC} \\
+    \midrule
+    \multirow{3}{*}{Enshi}
+      & Full LCAD--RASA                         & 61 & 0.702 \\
+      & Real-report-only decoder                & 61 & 0.617 \\
+      & Report generation without section alignment & 61 & 0.697 \\
+    \hdashline
+    \multirow{3}{*}{Jingzhou}
+      & Full LCAD--RASA                         & 55 & 0.648 \\
+      & Real-report-only decoder                & 55 & 0.315 \\
+      & Report generation without section alignment & 55 & 0.704 \\
+    \hdashline
+    \multirow{3}{*}{Shiyan}
+      & Full LCAD--RASA                         & 79 & 0.500 \\
+      & Real-report-only decoder                & 79 & 0.500 \\
+      & Report generation without section alignment & 79 & 0.500 \\
+    \hdashline
+    \multirow{3}{*}{Wuhan Renmin}
+      & Full LCAD--RASA                         & 13 & 1.000 \\
+      & Real-report-only decoder                & 13 & 1.000 \\
+      & Report generation without section alignment & 13 & 1.000 \\
+    \hdashline
+    \multirow{3}{*}{Xiangyang}
+      & Full LCAD--RASA                         & 80 & 0.382 \\
+      & Real-report-only decoder                & 80 & 0.382 \\
+      & Report generation without section alignment & 80 & 0.370 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item F1, sensitivity, and specificity were 0.000, 0.000, and 1.000, respectively, for all rows under this fixed quick-budget strict LOCO setting; these constant columns were omitted.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S2b. Eval-only LOCO using the global checkpoint.}
+  \label{tab:s2b_loco_eval_only_global_ckpt}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{llrrrr}
+    \toprule
+    \textbf{\makecell[l]{Held-out centre\\($n$; label consistency)}} & \textbf{Model} & \textbf{AUROC} & \textbf{F1} & \textbf{Sensitivity} & \textbf{Specificity} \\
+    \midrule
+    \multirow{4}{*}{\makecell[l]{Enshi\\(288; 0.741)}}
+      & Real-report-only decoder            & 0.809 & 0.500 & 0.374 & 0.944 \\
+      & Simple concatenation fusion         & 0.424 & 0.480 & 1.000 & 0.000 \\
+      & LCAD without section alignment      & 0.863 & 0.636 & 0.527 & 0.939 \\
+      & Full LCAD--RASA                     & 0.821 & 0.122 & 0.066 & 0.995 \\
+    \hdashline
+    \multirow{4}{*}{\makecell[l]{Jingzhou\\(288; 0.587)}}
+      & Real-report-only decoder            & 0.830 & 0.000 & 0.000 & 1.000 \\
+      & Simple concatenation fusion         & 0.652 & 0.000 & 0.000 & 1.000 \\
+      & LCAD without section alignment      & 0.877 & 0.200 & 0.111 & 1.000 \\
+      & Full LCAD--RASA                     & 0.848 & 0.000 & 0.000 & 1.000 \\
+    \hdashline
+    \multirow{4}{*}{\makecell[l]{Xiangyang\\(288; 0.648)}}
+      & Real-report-only decoder            & 0.657 & 0.071 & 0.038 & 0.996 \\
+      & Simple concatenation fusion         & 0.506 & 0.000 & 0.000 & 1.000 \\
+      & LCAD without section alignment      & 0.864 & 0.545 & 0.396 & 0.987 \\
+      & Full LCAD--RASA                     & 0.850 & 0.203 & 0.113 & 1.000 \\
+    \hdashline
+    \multirow{4}{*}{\makecell[l]{Wuda\\(89; 0.955)}}
+      & Real-report-only decoder            & 0.736 & 0.159 & 0.086 & 1.000 \\
+      & Simple concatenation fusion         & 0.548 & 0.024 & 0.012 & 1.000 \\
+      & LCAD without section alignment      & 0.901 & 0.970 & 1.000 & 0.375 \\
+      & Full LCAD--RASA                     & 0.894 & 0.936 & 0.901 & 0.750 \\
+    \hdashline
+    \multirow{4}{*}{\makecell[l]{Shiyan\\(288; 0.566)}}
+      & Real-report-only decoder            & 0.592 & 0.000 & 0.000 & 0.968 \\
+      & Simple concatenation fusion         & 0.444 & 0.022 & 0.250 & 0.701 \\
+      & LCAD without section alignment      & 0.747 & 0.400 & 0.250 & 1.000 \\
+      & Full LCAD--RASA                     & 0.735 & 0.000 & 0.000 & 1.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Eval-only LOCO is reported separately from strict LOCO retraining and is not pooled with strict LOCO results. Repeated $n$ and label-consistency values were merged into the centre column.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S3. Modality ablation.}
+  \label{tab:s3_modality_ablation}
+  \small
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrr}
+    \toprule
+    \textbf{Variant} & \textbf{AUROC} & \textbf{F1} & \textbf{Sensitivity} & \textbf{Specificity} \\
+    \midrule
+    Colposcopy + clinical instruction        & 0.850 & 0.524 & 0.614 & 0.869 \\
+    Full without fused visual embedding      & 0.840 & 0.571 & 0.500 & 0.955 \\
+    OCT + colposcopy + clinical instruction  & 0.840 & 0.571 & 0.500 & 0.955 \\
+    Colposcopy only                          & 0.838 & 0.581 & 0.614 & 0.910 \\
+    Full with fused visual embedding         & 0.836 & 0.561 & 0.523 & 0.939 \\
+    OCT + colposcopy                         & 0.826 & 0.543 & 0.568 & 0.906 \\
+    OCT + clinical instruction               & 0.765 & 0.466 & 0.386 & 0.951 \\
+    OCT only                                 & 0.740 & 0.353 & 0.409 & 0.836 \\
+    Clinical instruction only                & 0.683 & 0.441 & 0.727 & 0.717 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Label consistency was 0.641 for all modality variants and was removed as a constant column.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S4. LCAD pseudo-report quality-control ablation.}
+  \label{tab:s4_lcad_qc_ablation}
+  \small
+  \begin{threeparttable}
+  \begin{tabular}{lrrrr}
+    \toprule
+    \textbf{QC strategy} & \textbf{AUROC} & \textbf{F1} & \textbf{Sensitivity} & \textbf{Specificity} \\
+    \midrule
+    \makecell[l]{Pseudo reports, no QC;\\QC-pass pseudo reports only;\\QC-score weighting only;\\Pseudo confidence weighting only;\\QC-confidence weighted pseudo reports} & 0.836 & 0.561 & 0.523 & 0.939 \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All QC variants produced identical downstream metrics under this retrospective configuration. Duplicate rows were therefore merged. Label consistency was 0.641 for all variants.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S5. RASA component ablation.}
+  \label{tab:s5_rasa_component_ablation}
+  \small
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrr}
+    \toprule
+    \textbf{Variant} & \textbf{AUROC} & \textbf{F1} & \textbf{Sensitivity} & \textbf{Specificity} \\
+    \midrule
+    Risk-head auxiliary only                 & 0.838 & 0.538 & 0.568 & 0.902 \\
+    No section alignment                     & 0.838 & 0.479 & 0.636 & 0.816 \\
+    No label-consistency loss                & 0.836 & 0.579 & 0.500 & 0.959 \\
+    Full LCAD--RASA                          & 0.836 & 0.561 & 0.523 & 0.939 \\
+    \makecell[l]{No risk head;\\Report loss only;\\Section alignment auxiliary only} & 0.500 & 0.265 & 1.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Label consistency was 0.641 for all component variants and was removed as a constant column. Three variants with identical metrics were merged into one row.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S7. Multi-seed AUROC stability.}
+  \label{tab:s7_multiseed_stability}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrr}
+    \toprule
+    \textbf{Model} & \textbf{Mean AUROC} & \textbf{95\% interval} & \textbf{SD} \\
+    \midrule
+    Full LCAD--RASA                          & 0.776 & [0.773, 0.781] & 0.004 \\
+    Report generation without section alignment & 0.780 & [0.767, 0.795] & 0.012 \\
+    Real-report-only decoder                 & 0.667 & [0.656, 0.679] & 0.010 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item The original metric-by-row table contained several constant rows. Across all seeds and models, F1 was 0.000, section completeness was 1.000, hallucination rate was 0.000, and label consistency was 0.641; the table therefore reports the variable stability metric, AUROC.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table}[t]
+  \centering
+  \caption{Supplementary Table S8. LLM pseudo-report quality-control summary.}
+  \label{tab:s8_llm_pseudo_report_qc}
+  \small
+  \begin{threeparttable}
+  \begin{tabular}{lrr}
+    \toprule
+    \textbf{Source} & \textbf{$n$} & \textbf{Pass rate} \\
+    \midrule
+    Mock pseudo reports & 1,153 & 1.000 \\
+    LLM pseudo reports  & 1,153 & 1.000 \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Invalid placeholder entries and duplicated source-table metadata were removed. The quality-summary row also contained $n_{\mathrm{QC}}=1,153$ and pass rate = 1.000.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S9. Report-level safety metrics.}
+  \label{tab:s9_report_safety_metrics}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lrrrrr}
+    \toprule
+    \textbf{Evaluated settings} & \textbf{\makecell{Missing-modality\\hallucination}} & \textbf{\makecell{Label-report\\contradiction}} & \textbf{\makecell{Recommendation\\contradiction}} & \textbf{\makecell{Section\\incompleteness}} & \textbf{\makecell{Any\\hallucination}} \\
+    \midrule
+    \makecell[l]{Real-report-only decoder;\\Simple concatenation fusion;\\No section alignment;\\Full LCAD--RASA;\\Pseudo reports, no QC;\\QC-confidence weighted pseudo reports}
+    & 0.000 & 0.847 & 0.000 & 0.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item All evaluated settings had identical safety metrics; duplicate rows were merged.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S10. Masking validation across agent settings and centres.}
+  \label{tab:s10_masking_validation}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{llrrrrr}
+    \toprule
+    \textbf{Setting} & \textbf{Centre} & \textbf{$n$} & \textbf{Label consistency} & \textbf{ROUGE-L} & \textbf{BLEU} & \textbf{METEOR} \\
+    \midrule
+    \multirow{4}{*}{Label-only agent}
+      & Enshi                  & 406 & 0.659 & 0.000 & 0.000 & 0.000 \\
+      & Jingzhou               & 334 & 0.513 & 0.000 & 0.000 & 0.000 \\
+      & Xiangyang              & 4   & 0.500 & 0.000 & 0.000 & 0.000 \\
+      & Enshi--Jingzhou pooled & 740 & 0.593 & 0.000 & 0.000 & 0.000 \\
+    \hdashline
+    \multirow{4}{*}{\makecell[l]{Modality-only agent;\\Modality-plus-label agent}}
+      & Enshi                  & 406 & 0.746 & 0.002 & 0.002 & 0.002 \\
+      & Jingzhou               & 334 & 0.564 & 0.000 & 0.000 & 0.000 \\
+      & Xiangyang              & 4   & 0.750 & 0.000 & 0.000 & 0.000 \\
+      & Enshi--Jingzhou pooled & 740 & 0.664 & 0.000 & 0.000 & 0.000 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item The modality-only and modality-plus-label agents produced identical values across centres; duplicate rows were merged.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}
+
+
+\begin{table*}[t]
+  \centering
+  \caption{Supplementary Table S11. Scalability and runtime summary.}
+  \label{tab:s11_scalability_runtime}
+  \scriptsize
+  \begin{threeparttable}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{lr}
+    \toprule
+    \textbf{Metric} & \textbf{Value} \\
+    \midrule
+    \multicolumn{2}{l}{\textbf{Cohort and image scale}} \\
+    Total cases & 1,897 \\
+    Total centres & 5 \\
+    Total images & 137,591 \\
+    OCT images & 129,030 \\
+    Colposcopy images & 8,561 \\
+    Mean images per case & 72.531 \\
+    Median images per case & 123 \\
+    Maximum images per case & 144 \\
+    Real-report cases & 744 \\
+    Pseudo-report cases & 1,153 \\
+    Missing-report rate & 0.608 \\
+    \hdashline
+    \multicolumn{2}{l}{\textbf{Storage and checkpoint size}} \\
+    Embedding storage & 47.349 MB \\
+    Embedding files & 5,691 \\
+    Publishable checkpoint size, Full LCAD--RASA / LCAD-augmented / real-report-only & 79.882 MB \\
+    Publishable checkpoint size, simple fusion / fusion plus section alignment & 79.879 MB \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \begin{tablenotes}[flushleft]
+    \footnotesize
+    \item Placeholder columns and repeated section labels were removed. Checkpoint rows with identical sizes were merged.
+  \end{tablenotes}
+  \end{threeparttable}
+\end{table*}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replot legacy next-stage figures with Times New Roman + JBD palette (no retrain)."""
+"""Replot legacy next-stage figures with Arial + journal palette (no retrain)."""
 
 from __future__ import annotations
 
@@ -18,14 +18,17 @@ sys.path.insert(0, str(ROOT))
 
 from src.supplementary.jbd_figures_seaborn import (
     C0,
+    C1,
+    C2,
     C4,
     C6,
+    EDGE_DARK,
     PALETTE_MAIN,
+    TEXT_DARK,
     _cmap_diverging,
     _save,
     _setup_theme,
 )
-from src.utils.config import resolve_project_root
 
 
 def _tables(project: Path) -> Path:
@@ -45,9 +48,9 @@ def replot_rasa_pareto(project: Path, fig_dir: Path) -> None:
         if xcol not in out.columns:
             continue
         fig, ax = plt.subplots(figsize=(6, 5))
-        ax.scatter(out[xcol], out["auc"], c=C0, edgecolors="#d9d8d8", s=80, linewidth=0.8)
+        ax.scatter(out[xcol], out["auc"], c=C0, edgecolors=TEXT_DARK, s=90, linewidth=0.8)
         for _, r in out.iterrows():
-            ax.annotate(str(r["lambda_align"]), (r[xcol], r["auc"]), fontsize=8, fontfamily="serif")
+            ax.annotate(str(r["lambda_align"]), (r[xcol], r["auc"]), fontsize=8, fontfamily="Arial", fontweight="bold", xytext=(4, 4), textcoords="offset points")
         ax.set_xlabel(xcol.replace("_", " "))
         ax.set_ylabel("AUROC")
         ax.set_title(title)
@@ -65,7 +68,10 @@ def replot_reference_stratified(project: Path, fig_dir: Path) -> None:
         return
     _setup_theme()
     fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(data=ref, x="experiment_id", y="auc", palette=PALETTE_MAIN, ax=ax, legend=False)
+    ref = ref.copy()
+    ref["label"] = ref["experiment_id"].str.replace("_", " ").str.title()
+    sns.barplot(data=ref, x="label", y="auc", palette=PALETTE_MAIN, ax=ax, edgecolor=EDGE_DARK, linewidth=0.9, alpha=0.86, legend=False)
+    sns.stripplot(data=ref, x="label", y="auc", color=C4, marker="s", size=8, ax=ax, jitter=False)
     ax.set_ylabel("AUROC")
     ax.set_title("AUROC by model (reference-available subset)")
     ax.tick_params(axis="x", rotation=30)
@@ -83,7 +89,10 @@ def replot_threshold_f1(project: Path, fig_dir: Path) -> None:
         return
     _setup_theme()
     fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(data=sub, x="experiment_id", y="f1", palette=PALETTE_MAIN, ax=ax, legend=False)
+    sub = sub.copy()
+    sub["label"] = sub["experiment_id"].str.replace("_", " ").str.title()
+    sns.barplot(data=sub, x="label", y="f1", palette=PALETTE_MAIN, ax=ax, edgecolor=EDGE_DARK, linewidth=0.9, alpha=0.86, legend=False)
+    sns.stripplot(data=sub, x="label", y="f1", color=C4, marker="^", size=8, ax=ax, jitter=False)
     ax.set_title("Test F1 at validation-selected max-F1 threshold")
     ax.tick_params(axis="x", rotation=30)
     fig.tight_layout()
@@ -121,8 +130,8 @@ def replot_multiseed_boxplot(project: Path, fig_dir: Path) -> None:
     _setup_theme()
     fig, ax = plt.subplots(figsize=(7, 5))
     model_col = "model" if "model" in raw.columns else "experiment_id"
-    sns.boxplot(data=raw, x=model_col, y="auc", palette=PALETTE_MAIN, ax=ax, linewidth=0.8)
-    sns.stripplot(data=raw, x=model_col, y="auc", color=C6, size=5, alpha=0.6, ax=ax, jitter=0.15)
+    sns.boxplot(data=raw, x=model_col, y="auc", palette=[C1, C3] if "C3" in globals() else PALETTE_MAIN, ax=ax, linewidth=0.9, fliersize=0)
+    sns.stripplot(data=raw, x=model_col, y="auc", color=C6, size=5.5, alpha=0.7, ax=ax, jitter=0.15)
     ax.set_title("Multi-seed test AUROC")
     ax.tick_params(axis="x", rotation=20)
     fig.tight_layout()
@@ -130,7 +139,7 @@ def replot_multiseed_boxplot(project: Path, fig_dir: Path) -> None:
 
 
 def main():
-    project = resolve_project_root()
+    project = ROOT
     fig_dir = project / "outputs/publishable/figures"
     _setup_theme()
     replot_rasa_pareto(project, fig_dir)
@@ -139,7 +148,7 @@ def main():
     replot_loco_strict_heatmap(project, fig_dir)
     replot_multiseed_boxplot(project, fig_dir)
     print(f"Legacy figures refreshed: {fig_dir}")
-    print("Font: Times New Roman (serif); palette: #8b98b3 ... #d9d8d8")
+    print("Font: Arial; palette: #576fa0 #a7b9d7 #e3b87f #fadcb4 #b57979 #dea3a2 #9f9f9f #cfcece")
 
 
 if __name__ == "__main__":

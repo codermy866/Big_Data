@@ -15,9 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.supplementary.jbd_ablation_figures import JBD_PALETTE_HEX, generate_all_ablation_figures
-from src.utils.config import resolve_project_root
-
-PROJECT = resolve_project_root()
+PROJECT = ROOT
 TABLES = PROJECT / "outputs/publishable/tables"
 MANUSCRIPT = TABLES / "manuscript"
 FIG_ABL = PROJECT / "outputs/publishable/figures/ablation"
