@@ -50,17 +50,17 @@ MANUSCRIPT_TABLES = ROOT / "outputs/publishable/tables/manuscript"
 SUMMARY_MD = ROOT / "outputs/publishable/external_baselines/EXTERNAL_BASELINE_BLOCK_SUMMARY.md"
 
 PALETTE = [
-    "#576fa0",
-    "#a7b9d7",
-    "#e3b87f",
-    "#fadcb4",
-    "#b57979",
-    "#dea3a2",
-    "#9f9f9f",
-    "#cfcece",
+    "#2f5f8f",
+    "#8fb8d8",
+    "#d9a066",
+    "#efd7b5",
+    "#9e3f3a",
+    "#d47f6f",
+    "#7f7f7f",
+    "#d6d6d6",
 ]
 TEXT = "#343434"
-GRID = "#cfcece"
+GRID = "#d6d6d6"
 
 
 def setup_theme() -> None:
@@ -89,7 +89,7 @@ def setup_theme() -> None:
             "legend.fontsize": 10,
             "grid.color": GRID,
             "grid.alpha": 0.55,
-            "axes.edgecolor": "#9f9f9f",
+            "axes.edgecolor": "#7f7f7f",
             "axes.labelcolor": TEXT,
             "text.color": TEXT,
         },
@@ -613,7 +613,7 @@ def build_figures(table: pd.DataFrame, paired: pd.DataFrame) -> None:
                     linewidth=0.8,
                     zorder=3,
                 )
-            ax.axvline(0, ls="--", color="#9f9f9f", lw=1.2)
+            ax.axvline(0, ls="--", color="#7f7f7f", lw=1.2)
             ax.set_yticks(range(len(p)))
             ax.set_yticklabels(p["comparator"].tolist())
             ax.set_xlabel("Paired bootstrap delta AUROC (Full LCAD-RASA - comparator)")

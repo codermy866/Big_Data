@@ -9,6 +9,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from src.models_publishable.lcad_rasa_model import stable_token_id
+
 
 def _pseudo_to_text(report: dict) -> str:
     return " ".join(
@@ -92,7 +94,7 @@ class CervixReportDataset(Dataset):
         return len(self.indices)
 
     def _text_to_ids(self, text: str) -> torch.Tensor:
-        ids = [hash(w) % self.vocab_size for w in text.split()[: self.max_len]]
+        ids = [stable_token_id(w, self.vocab_size) for w in text.split()[: self.max_len]]
         ids += [0] * max(0, self.max_len - len(ids))
         return torch.tensor(ids[: self.max_len], dtype=torch.long)
 

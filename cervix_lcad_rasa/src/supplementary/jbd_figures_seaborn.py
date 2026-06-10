@@ -23,16 +23,16 @@ MANUSCRIPT_REL = "outputs/publishable/tables/manuscript"
 PRED_REL = "outputs/publishable/predictions/final_per_case"
 TABLES_REL = "outputs/publishable/tables"
 
-# JBD manuscript palette (journal-style blue/gold/red/grey)
+# Cell Press-inspired manuscript palette (blue, cream, brick red, neutral grey).
 JBD_PALETTE_HEX = [
-    "#576fa0",
-    "#a7b9d7",
-    "#e3b87f",
-    "#fadcb4",
-    "#b57979",
-    "#dea3a2",
-    "#9f9f9f",
-    "#cfcece",
+    "#2f5f8f",
+    "#8fb8d8",
+    "#d9a066",
+    "#efd7b5",
+    "#9e3f3a",
+    "#d47f6f",
+    "#7f7f7f",
+    "#d6d6d6",
 ]
 PALETTE_MAIN = sns.color_palette(JBD_PALETTE_HEX)
 C0, C1, C2, C3, C4, C5, C6, C7 = JBD_PALETTE_HEX
@@ -42,22 +42,27 @@ TEXT_DARK = "#3a3a3a"
 EDGE_DARK = C6
 GRID_LINE = C7
 NATURE_HEATMAP_SEQ = [
-    "#f7f6f0",
-    "#e7e1d4",
-    "#d4bf8b",
-    "#c28b73",
-    "#a65f6f",
-    "#6f5a86",
-    "#334a7d",
+    "#f7f7f2",
+    "#eef4f3",
+    "#e1ecef",
+    "#d4e5eb",
+    "#c3dae6",
+    "#abcade",
+    "#8fb8d8",
+    "#6f9bc3",
+    "#5d88b3",
+    "#4775a2",
+    "#2f5f8f",
+    "#1f3f64",
 ]
 NATURE_HEATMAP_DIV = [
-    "#334a7d",
-    "#7f98bf",
-    "#dbe5ef",
-    "#f7f6f0",
-    "#e7c27f",
-    "#c9796d",
-    "#8b3f54",
+    "#2f6f9f",
+    "#7faac0",
+    "#d9e8e6",
+    "#f8f4ec",
+    "#efc7ad",
+    "#d68572",
+    "#b95750",
 ]
 PALETTE_MODEL = {
     "Full LCAD-RASA": C0,
@@ -74,15 +79,15 @@ PALETTE_MODEL = {
 
 
 def _cmap_sequential() -> object:
-    from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.colors import ListedColormap
 
-    return LinearSegmentedColormap.from_list("nature_seq_muted", NATURE_HEATMAP_SEQ, N=256)
+    return ListedColormap(NATURE_HEATMAP_SEQ, name="cell_seq_blue")
 
 
 def _cmap_diverging() -> object:
     from matplotlib.colors import LinearSegmentedColormap
 
-    return LinearSegmentedColormap.from_list("nature_div_muted", NATURE_HEATMAP_DIV, N=256)
+    return LinearSegmentedColormap.from_list("cell_div_blue_red", NATURE_HEATMAP_DIV, N=256)
 
 
 def _setup_theme() -> None:
@@ -170,11 +175,11 @@ def fig01_pipeline_schematic(out_dir: Path) -> None:
     ax.axis("off")
     stages = [
         "Multicentre cohort\nn = 1,897",
-        "ResNet50\nembeddings",
-        "LCAD pseudo-reports\n(local structured)",
-        "QC &\nweighting",
-        "RASA section\nalignment",
-        "Risk +\nstructured report",
+        "Phase O: LCAD\npseudo-reports",
+        "Phase S: RASA\nsection alignment",
+        "Semantic bank\n(train-only)",
+        "Phase C: calibrated\nlogit fusion",
+        "MOSAIC risk\nscore",
     ]
     colors = [JBD_PALETTE_HEX[i % len(JBD_PALETTE_HEX)] for i in range(len(stages))]
     xs = np.linspace(0.06, 0.94, len(stages))
@@ -183,8 +188,9 @@ def fig01_pipeline_schematic(out_dir: Path) -> None:
         ax.text(x, 0.5, s, ha="center", va="center", fontsize=9, color=TEXT_DARK, fontweight="medium")
         if i < len(stages) - 1:
             ax.annotate("", xy=(xs[i + 1] - 0.085, 0.5), xytext=(x + 0.085, 0.5), arrowprops=dict(arrowstyle="-|>", color=EDGE_DARK, lw=2))
-    ax.set_title("LCAD-RASA: case-level report supervision under big-data cervical screening", fontsize=12, pad=12)
+    ax.set_title("MOSAIC: Multicentre Offline Structured Anchoring with Imbalanced-report Calibration", fontsize=12, pad=12)
     _save(fig, out_dir / "Figure1_pipeline_schematic")
+    _save(fig, out_dir / "Figure1_study_design")
 
 
 def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
@@ -282,7 +288,7 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
     for y, (_, row) in zip(y_positions, data.iterrows()):
         color = centre_colors[row["Centre label"]]
         if y % 2 == 1:
-            ax_cover.axhspan(y - 0.5, y + 0.5, color="#f7f6f0", alpha=0.62, zorder=0)
+            ax_cover.axhspan(y - 0.5, y + 0.5, color="#f7f7f2", alpha=0.62, zorder=0)
         ax_cover.hlines(y, 0, row["Real-report coverage"], color=color, linewidth=2.4, alpha=0.56, zorder=2)
         ax_cover.scatter(
             row["Real-report coverage"],
@@ -1571,11 +1577,12 @@ def generate_all_seaborn_figures(project: Path) -> list[str]:
     main_dir = project / "outputs/publishable/figures/main"
     _sync_main_figures(jbd_final, main_dir)
 
-    # Legacy composite name used in manuscript
+    # Legacy composite name used in manuscript and older submission bundles.
     for ext in (".png", ".pdf"):
         src = jbd_final / f"Figure_main_AUC_pointplot{ext}"
         if src.is_file():
-            shutil.copy2(src, pub_fig / f"Figure_main_AUC_comparison{ext}")
+            for dst_dir in (jbd_final, pub_fig):
+                shutil.copy2(src, dst_dir / f"Figure_main_AUC_comparison{ext}")
 
     write_figure_index(jbd_final, entries)
     write_figure_index(pub_fig, entries)

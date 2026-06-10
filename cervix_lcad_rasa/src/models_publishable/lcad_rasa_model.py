@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +17,14 @@ try:
 except ImportError:
     _TORCH = False
 
+from src.models_publishable.semantic_token_packer import SemanticTokenPacker
+
 
 class PublishableLCADRASA(nn.Module):
     def __init__(
         self,
         visual_dim: int = 2048,
+        semantic_dim: int = 512,
         hidden_size: int = 512,
         vocab_size: int = 8192,
         max_len: int = 128,
@@ -30,6 +34,10 @@ class PublishableLCADRASA(nn.Module):
         use_colposcopy: bool = True,
         use_instruction: bool = True,
         use_fused_visual: bool = True,
+        use_topic_head: bool = False,
+        num_report_topics: int = 0,
+        use_semantic_retrieval: bool = False,
+        semantic_num_queries: int = 4,
         dropout: float = 0.1,
     ):
         super().__init__()
@@ -40,10 +48,20 @@ class PublishableLCADRASA(nn.Module):
         self.use_colposcopy = use_colposcopy
         self.use_instruction = use_instruction
         self.use_fused_visual = use_fused_visual
+        self.use_topic_head = use_topic_head and num_report_topics > 1
+        self.num_report_topics = int(num_report_topics)
+        self.use_semantic_retrieval = use_semantic_retrieval
         self.oct_proj = nn.Linear(visual_dim, hidden_size)
         self.col_proj = nn.Linear(visual_dim, hidden_size)
         self.fused_proj = nn.Linear(visual_dim, hidden_size)
         self.instr_proj = nn.Linear(32, hidden_size)
+        self.semantic_proj = nn.Linear(semantic_dim, hidden_size) if use_semantic_retrieval else None
+        self.semantic_token_packer = (
+            SemanticTokenPacker(hidden_size, num_queries=semantic_num_queries, dropout=dropout)
+            if use_semantic_retrieval
+            else None
+        )
+        self.semantic_gate = nn.Sequential(nn.Linear(hidden_size * 2, hidden_size), nn.Sigmoid()) if use_semantic_retrieval else None
         self.label_embed = nn.Embedding(2, hidden_size)
         self.fusion = nn.Sequential(nn.Linear(hidden_size * 4, hidden_size), nn.ReLU(), nn.Dropout(dropout))
         self.token_embed = nn.Embedding(vocab_size, hidden_size)
@@ -51,6 +69,7 @@ class PublishableLCADRASA(nn.Module):
         self.encoder = nn.TransformerEncoder(enc_layer, num_layers=2)
         self.decoder = nn.Linear(hidden_size, vocab_size)
         self.risk_head = nn.Linear(hidden_size, 1) if use_risk_head else None
+        self.topic_head = nn.Linear(hidden_size, self.num_report_topics) if self.use_topic_head else None
         self.sec_oct = nn.Linear(hidden_size, hidden_size)
         self.sec_col = nn.Linear(hidden_size, hidden_size)
         self.sec_instr = nn.Linear(hidden_size, hidden_size)
@@ -64,6 +83,7 @@ class PublishableLCADRASA(nn.Module):
         instr_vec: torch.Tensor,
         labels: torch.Tensor | None,
         modality_mask: dict[str, bool] | None = None,
+        semantic_emb: torch.Tensor | None = None,
     ) -> torch.Tensor:
         m = modality_mask or {}
         o = self.oct_proj(oct_emb) * (0.0 if m.get("mask_oct") or not self.use_oct else 1.0)
@@ -76,6 +96,15 @@ class PublishableLCADRASA(nn.Module):
         else:
             parts.append(torch.zeros_like(o))
         h = self.fusion(torch.cat(parts[:4], dim=-1))
+        if self.use_semantic_retrieval and self.semantic_proj is not None and self.semantic_token_packer is not None:
+            if semantic_emb is None:
+                sem = torch.zeros_like(o)
+            else:
+                sem = self.semantic_proj(semantic_emb.to(o.device))
+            token_stack = torch.stack([o, c, f, ins, sem], dim=1)
+            packed = self.semantic_token_packer(token_stack)
+            gate = self.semantic_gate(torch.cat([h, packed], dim=-1)) if self.semantic_gate is not None else 0.5
+            h = h + gate * packed
         return h
 
     def forward(
@@ -87,8 +116,9 @@ class PublishableLCADRASA(nn.Module):
         input_ids: torch.Tensor,
         labels: torch.Tensor | None = None,
         modality_mask: dict | None = None,
+        semantic_emb: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        h0 = self.encode_modalities(oct_emb, col_emb, fused_emb, instr_vec, labels, modality_mask)
+        h0 = self.encode_modalities(oct_emb, col_emb, fused_emb, instr_vec, labels, modality_mask, semantic_emb)
         x = self.token_embed(input_ids.clamp(0, self.token_embed.num_embeddings - 1))
         x = x + h0.unsqueeze(1)
         h = self.encoder(x)
@@ -96,6 +126,10 @@ class PublishableLCADRASA(nn.Module):
         out = {"logits": logits, "hidden": h, "fused": h0}
         if self.risk_head is not None:
             out["risk_logit"] = self.risk_head(h0)
+        if self.topic_head is not None:
+            out["report_topic_logits"] = self.topic_head(h0)
+        if self.use_semantic_retrieval and self.semantic_proj is not None and semantic_emb is not None:
+            out["semantic_projected"] = self.semantic_proj(semantic_emb.to(h0.device))
         return out
 
     @torch.no_grad()
@@ -109,6 +143,7 @@ class PublishableLCADRASA(nn.Module):
         row: dict | None = None,
         modality_mask: dict | None = None,
         input_ids: torch.Tensor | None = None,
+        semantic_emb: torch.Tensor | None = None,
     ) -> dict[str, Any]:
         """Decode modality-conditioned structured report (Prompt I text decoding)."""
         m = modality_mask or {}
@@ -118,13 +153,13 @@ class PublishableLCADRASA(nn.Module):
         lab_t = torch.tensor([effective_label], device=device)
         if input_ids is None:
             seed_text = str(row.get("training_report_text", row.get("reference_report_text", "cervical examination")))
-            ids = [hash(w) % self.token_embed.num_embeddings for w in seed_text.split()[: self.max_len]]
+            ids = [stable_token_id(w, self.token_embed.num_embeddings) for w in seed_text.split()[: self.max_len]]
             ids += [0] * max(0, self.max_len - len(ids))
             input_ids = torch.tensor([ids[: self.max_len]], dtype=torch.long, device=device)
         else:
             input_ids = input_ids.to(device)
 
-        out = self.forward(oct_emb, col_emb, fused_emb, instr_vec, input_ids, lab_t, modality_mask=m)
+        out = self.forward(oct_emb, col_emb, fused_emb, instr_vec, input_ids, lab_t, modality_mask=m, semantic_emb=semantic_emb)
         h0 = out["fused"]
         risk_logit = out.get("risk_logit")
         risk_score = float(torch.sigmoid(risk_logit).item()) if risk_logit is not None else 0.5
@@ -233,6 +268,17 @@ class PublishableLCADRASA(nn.Module):
             losses.append(1.0 - (a * b).sum(-1))
         return torch.stack(losses, dim=0).mean()
 
+    def semantic_retrieval_loss(self, h0: torch.Tensor, semantic_projected: torch.Tensor | None) -> torch.Tensor:
+        if not self.use_semantic_retrieval or semantic_projected is None:
+            return torch.tensor(0.0, device=h0.device)
+        a = F.normalize(h0, dim=-1)
+        b = F.normalize(semantic_projected, dim=-1)
+        cosine_loss = 1.0 - (a * b).sum(-1).mean()
+        logits = a @ b.transpose(0, 1)
+        targets = torch.arange(logits.size(0), device=logits.device)
+        contrastive = F.cross_entropy(logits, targets) if logits.size(0) > 1 else torch.tensor(0.0, device=h0.device)
+        return cosine_loss + 0.1 * contrastive
+
 
 def load_visual_emb(path: str, dim: int = 2048) -> np.ndarray:
     p = Path(path)
@@ -246,9 +292,19 @@ def load_visual_emb(path: str, dim: int = 2048) -> np.ndarray:
     return np.zeros(dim, dtype=np.float32)
 
 
+def load_semantic_emb(path: str, dim: int = 512) -> np.ndarray:
+    return load_visual_emb(path, dim=dim)
+
+
+def stable_token_id(value: object, modulo: int) -> int:
+    text = str(value).encode("utf-8", errors="ignore")
+    digest = hashlib.blake2b(text, digest_size=8).digest()
+    return int.from_bytes(digest, byteorder="little", signed=False) % int(modulo)
+
+
 def instr_vector(row: dict, dim: int = 32) -> np.ndarray:
     parts = [str(row.get("age", 0)), str(row.get("hpv", "")), str(row.get("tct", ""))]
-    vec = np.array([hash(p) % 997 / 997.0 for p in parts], dtype=np.float32)
+    vec = np.array([stable_token_id(p, 997) / 997.0 for p in parts], dtype=np.float32)
     out = np.zeros(dim, dtype=np.float32)
     out[: len(vec)] = vec
     return out

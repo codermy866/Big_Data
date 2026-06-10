@@ -26,7 +26,7 @@ def main():
     print(f"jbd_final: {project / 'outputs/publishable/figures/jbd_final'}")
     print(f"main:      {project / 'outputs/publishable/figures/main'}")
     print(f"legacy:    {project / 'outputs/publishable/figures'}")
-    print("Palette: #576fa0 #a7b9d7 #e3b87f #fadcb4 #b57979 #dea3a2 #9f9f9f #cfcece")
+    print("Palette: #2f5f8f #8fb8d8 #d9a066 #efd7b5 #9e3f3a #d47f6f #7f7f7f #d6d6d6")
 
     if args.refresh_submission_v2:
         import shutil

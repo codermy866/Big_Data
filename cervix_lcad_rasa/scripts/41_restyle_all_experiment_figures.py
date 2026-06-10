@@ -109,7 +109,7 @@ def _tile_heatmap(
     figsize: tuple[float, float] | None = None,
     max_label_chars: int = 34,
 ) -> None:
-    """Draw a publication-style annotated tile heatmap."""
+    """Draw a publication-style annotated polar-coordinate heatmap."""
     _setup_theme()
     m = matrix.copy()
     m = m.apply(pd.to_numeric, errors="coerce")
@@ -121,55 +121,186 @@ def _tile_heatmap(
         vmax = float(np.nanmax(m.to_numpy()))
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax == vmin:
         vmin, vmax = 0.0, 1.0
-    cmap = cmap or _cmap_sequential()
+    cmap = cmap or _cmap_diverging()
     n_rows, n_cols = m.shape
     if figsize is None:
-        figsize = (max(7.6, n_cols * 1.25), max(4.4, n_rows * 0.46 + 1.2))
+        side = max(8.2, n_cols * 0.95, n_rows * 0.28 + 4.6)
+        figsize = (side, side)
+    else:
+        side = max(max(figsize), 8.2)
+        figsize = (side, side)
+
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
+    from matplotlib.patches import Wedge
+
     fig, ax = plt.subplots(figsize=figsize)
-    mask = m.isna()
-    hm = sns.heatmap(
-        m,
-        mask=mask,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        annot=False,
-        linewidths=1.35,
-        linecolor="white",
-        cbar_kws={"label": cbar_label, "shrink": 0.82, "pad": 0.02},
-        ax=ax,
-    )
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    normer = Normalize(vmin=vmin, vmax=vmax)
     values = m.to_numpy(dtype=float)
+    theta_start = 90.0
+    full_circle_gap = 8.0 if n_cols > 2 else 12.0
+    usable_angle = 360.0 - full_circle_gap
+    sector = usable_angle / max(n_cols, 1)
+    gap = min(7.5, max(3.8, sector * 0.10))
+    inner_r = 0.48 if n_rows <= 10 else 0.43
+    outer_r = 1.00
+    ring_w = (outer_r - inner_r) / max(n_rows, 1)
+    group_r = 1.055
+    group_w = 0.052
+    row_label_font = max(2.9, min(7.2, 64.0 / max(n_rows, 1)))
+    col_label_font = max(5.0, min(8.0, 62.0 / max(n_cols, 1)))
+    value_font = max(2.8, min(6.8, 58.0 / max(n_rows + 0.65 * n_cols, 1)))
+    col_labels = [str(c)[:max_label_chars] for c in m.columns]
+    def _compact_row_label(label: object) -> str:
+        text = str(label)
+        replacements = [
+            ("gaussian_noise_colposcopy_", "noise_colpo_"),
+            ("gaussian_noise_oct_", "noise_OCT_"),
+            ("partial_colposcopy_drop_", "drop_colpo_"),
+            ("partial_oct_drop_", "drop_OCT_"),
+            ("label_only_inference", "label_only"),
+            ("center_shuffle", "center_shuffle"),
+            ("hpv_tct_shuffle", "hpv_tct_shuffle"),
+        ]
+        for old, new in replacements:
+            text = text.replace(old, new)
+        return text
+
+    row_max_chars = 42 if n_rows <= 12 else 30
+    row_labels = [_compact_row_label(i)[:row_max_chars] for i in m.index]
+    lim = group_r + group_w + 0.24
+    outer_band_colors = ["#6e87bd", "#cf8fa9", "#b8bfd8", "#bc8b7a", "#8ab7c4", "#d9a17c", "#9aa7b8", "#d7c6d6"]
+    annotate_values = (n_rows * n_cols) <= 120 and sector >= 18.0
+
+    def _xy(angle_deg: float, radius: float) -> tuple[float, float]:
+        angle = np.deg2rad(angle_deg)
+        return float(radius * np.cos(angle)), float(radius * np.sin(angle))
+
+    def _label_rotation(angle_deg: float) -> tuple[float, str]:
+        rot = angle_deg - 90.0
+        ha = "left"
+        if rot < -90.0:
+            rot += 180.0
+            ha = "right"
+        if rot > 90.0:
+            rot -= 180.0
+            ha = "right"
+        return rot, ha
+
+    # Outer annotated sector bands: one band per matrix column.
+    for j, label in enumerate(col_labels):
+        theta2 = theta_start - full_circle_gap / 2.0 - j * sector - gap / 2.0
+        theta1 = theta_start - full_circle_gap / 2.0 - (j + 1) * sector + gap / 2.0
+        band = Wedge(
+            (0, 0),
+            group_r + group_w,
+            theta1,
+            theta2,
+            width=group_w,
+            facecolor=outer_band_colors[j % len(outer_band_colors)],
+            edgecolor="white",
+            linewidth=1.4,
+            alpha=0.86,
+        )
+        ax.add_patch(band)
+        mid = (theta1 + theta2) / 2.0
+        x, y = _xy(mid, group_r + group_w + 0.085)
+        rot, ha = _label_rotation(mid)
+        ax.text(
+            x,
+            y,
+            label,
+            ha=ha,
+            va="center",
+            fontsize=col_label_font,
+            fontweight="bold",
+            rotation=rot,
+            rotation_mode="anchor",
+            color=TEXT_DARK,
+        )
+
+    # Annular heatmap tiles. Row order runs from the central hole outward.
     for i in range(n_rows):
         for j in range(n_cols):
             val = values[i, j]
-            if not np.isfinite(val):
+            r0 = inner_r + i * ring_w
+            r1 = r0 + ring_w
+            theta2 = theta_start - full_circle_gap / 2.0 - j * sector - gap / 2.0
+            theta1 = theta_start - full_circle_gap / 2.0 - (j + 1) * sector + gap / 2.0
+            face = "#f0f0f0" if not np.isfinite(val) else cmap(normer(val))
+            patch = Wedge(
+                (0, 0),
+                r1,
+                theta1,
+                theta2,
+                width=ring_w,
+                facecolor=face,
+                edgecolor="white",
+                linewidth=1.05 if n_rows <= 12 else 0.72,
+            )
+            ax.add_patch(patch)
+            if not np.isfinite(val) or not annotate_values:
                 continue
             norm = float(np.clip((val - vmin) / (vmax - vmin), 0, 1))
+            mid = (theta1 + theta2) / 2.0
+            x, y = _xy(mid, r0 + ring_w * 0.52)
             ax.text(
-                j + 0.5,
-                i + 0.5,
+                x,
+                y,
                 format(val, fmt),
                 ha="center",
                 va="center",
-                fontsize=8.2 if n_cols > 6 else 9.2,
+                fontsize=value_font,
                 fontweight="bold",
-                color="white" if norm > 0.56 else TEXT_DARK,
+                color="white" if norm < 0.18 or norm > 0.84 else TEXT_DARK,
             )
-    ax.set_xticklabels([str(c)[:max_label_chars] for c in m.columns], rotation=35, ha="right")
-    ax.set_yticklabels([str(i)[:max_label_chars] for i in m.index], rotation=0)
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.set_title(title, fontweight="bold")
-    ax.tick_params(axis="both", length=0)
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_color(EDGE_DARK)
-        spine.set_linewidth(0.9)
-    cbar = hm.collections[0].colorbar
-    cbar.set_label(cbar_label, fontweight="bold")
+
+    ax.text(0, 0.145, cbar_label, ha="center", va="center", fontsize=8.0, fontweight="bold", color=TEXT_DARK)
+
+    # Keep row names in a side label panel instead of over the annular bars.
+    left_margin = 0.185 if n_rows <= 12 else 0.255
+    fig.subplots_adjust(left=left_margin, right=0.965, top=0.88, bottom=0.07)
+    ax_box = ax.get_position()
+    side_x = 0.085 if n_rows <= 12 else 0.038
+    side_right = left_margin - 0.014
+    side_font = max(5.5, min(9.4, 94.0 / max(n_rows, 1)))
+    header_font = max(7.2, min(10.2, side_font + 1.0))
+    fig.text(side_x, ax_box.y0 + ax_box.height * 0.78, "Rows", ha="left", va="bottom", fontsize=header_font, fontweight="bold", color=TEXT_DARK)
+    fig.text(side_x, ax_box.y0 + ax_box.height * 0.755, "inner -> outer", ha="left", va="top", fontsize=max(4.8, side_font - 0.3), color="#6f6f6f")
+    if n_rows <= 14:
+        ys = np.linspace(ax_box.y0 + ax_box.height * 0.70, ax_box.y0 + ax_box.height * 0.31, n_rows)
+        for i, (label, y) in enumerate(zip(row_labels, ys), start=1):
+            fig.text(side_x, y, f"{i}. {label}", ha="left", va="center", fontsize=side_font, color=TEXT_DARK)
+    else:
+        split = int(np.ceil(n_rows / 2))
+        columns = [row_labels[:split], row_labels[split:]]
+        col_x = [side_x, side_x + (side_right - side_x) * 0.52]
+        for col_labels_subset, x0, start_idx in zip(columns, col_x, [1, split + 1]):
+            if not col_labels_subset:
+                continue
+            ys = np.linspace(ax_box.y0 + ax_box.height * 0.70, ax_box.y0 + ax_box.height * 0.27, len(col_labels_subset))
+            for offset, (label, y) in enumerate(zip(col_labels_subset, ys)):
+                fig.text(x0, y, f"{start_idx + offset}. {label}", ha="left", va="center", fontsize=side_font, color=TEXT_DARK)
+
+    # Compact central color scale; it is bounded by the inner hole.
+    sm = ScalarMappable(norm=normer, cmap=cmap)
+    sm.set_array([])
+    cax = fig.add_axes([ax_box.x0 + ax_box.width * 0.39, ax_box.y0 + ax_box.height * 0.47, ax_box.width * 0.22, 0.018])
+    cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
+    cbar.set_label("")
     cbar.outline.set_linewidth(0.8)
-    fig.tight_layout()
+    if vmax - vmin <= 1.2:
+        cbar.set_ticks([vmin, (vmin + vmax) / 2.0, vmax])
+    else:
+        cbar.set_ticks([vmin, (vmin + vmax) / 2.0, vmax])
+    cbar.ax.tick_params(labelsize=7.5, length=2.5, pad=1.5)
+
+    ax.set_title(title, fontweight="bold", pad=18, fontsize=16)
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
     _save_to_many(fig, stems)
 
 
@@ -247,7 +378,7 @@ def _restyle_theme1() -> list[Path]:
             y_map_panel = {label: i for i, label in enumerate(metric_labels)}
             for y, label in enumerate(metric_labels):
                 if y % 2 == 1:
-                    ax.axhspan(y - 0.46, y + 0.46, color="#f7f6f0", alpha=0.58, zorder=0)
+                    ax.axhspan(y - 0.46, y + 0.46, color="#f7f7f2", alpha=0.58, zorder=0)
                 ax.hlines(y, xlim[0], xlim[1], color=C7, linewidth=0.82, alpha=0.62, zorder=1)
             for source in source_order:
                 row = p[p["Source"].eq(source)]
@@ -387,7 +518,7 @@ def _restyle_theme1() -> list[Path]:
         for ax_idx, ax in enumerate(axes):
             for y in y_positions:
                 if y % 2 == 1:
-                    ax.axhspan(y - 0.5, y + 0.5, color="#f7f6f0", alpha=0.52, zorder=0)
+                    ax.axhspan(y - 0.5, y + 0.5, color="#f7f7f2", alpha=0.52, zorder=0)
             if "full_lcad_rasa" in y_map:
                 y_full = y_map["full_lcad_rasa"]
                 ax.axhspan(y_full - 0.5, y_full + 0.5, color=C1, alpha=0.18, zorder=0)

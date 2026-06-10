@@ -32,7 +32,21 @@ PUBLISHABLE_EXPERIMENTS = {
     "publishable_simple_fusion": {"training_eligible": 1, "model": {"use_section_align": False, "use_risk_head": False}},
     "publishable_fusion_plus_section_alignment": {"training_eligible": 1, "model": {"use_section_align": True, "use_risk_head": False}},
     "publishable_full_lcad_rasa": {"training_eligible": 1, "model": {"use_section_align": True, "use_risk_head": True}},
+    "publishable_kra_rasa": {"training_eligible": 1, "model": {"use_section_align": True, "use_risk_head": True, "use_semantic_retrieval": True}},
 }
+
+
+def _topic_aux_loss(out: dict, batch: dict, device: torch.device) -> torch.Tensor:
+    logits = out.get("report_topic_logits")
+    if logits is None:
+        return torch.tensor(0.0, device=device)
+    topic_id = batch["report_topic_id"].to(device)
+    topic_conf = batch["report_topic_confidence"].to(device)
+    valid = (topic_id >= 0) & (topic_id < logits.size(-1)) & (topic_conf > 0)
+    if not torch.any(valid):
+        return torch.tensor(0.0, device=device)
+    per_case = F.cross_entropy(logits[valid], topic_id[valid], reduction="none")
+    return (per_case * topic_conf[valid]).sum() / topic_conf[valid].sum().clamp_min(1e-6)
 
 
 def main():
@@ -41,7 +55,7 @@ def main():
     p.add_argument("--manifest", default=None)
     p.add_argument("--experiment", default="publishable_full_lcad_rasa")
     args = p.parse_args()
-    project = resolve_project_root()
+    project = resolve_project_root(ROOT)
     cfg = load_config(args.config, project)
     manifest_path = Path(args.manifest or cfg["manifest"]["path"])
     if not manifest_path.is_absolute():
@@ -63,8 +77,15 @@ def main():
     loader = DataLoader(ds, batch_size=int(cfg["training"]["batch_size"]), shuffle=True, num_workers=0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = PublishableLCADRASA(
+        visual_dim=int(cfg.get("model", {}).get("visual_dim", 2048)),
+        semantic_dim=int(cfg.get("model", {}).get("semantic_dim", 512)),
+        hidden_size=int(cfg.get("model", {}).get("hidden_size", 512)),
         use_risk_head=mflags.get("use_risk_head", True),
         use_section_align=mflags.get("use_section_align", True),
+        use_topic_head=bool(cfg.get("model", {}).get("use_topic_head", False)),
+        num_report_topics=int(cfg.get("model", {}).get("num_report_topics", 0)),
+        use_semantic_retrieval=bool(mflags.get("use_semantic_retrieval", cfg.get("model", {}).get("use_semantic_retrieval", False))),
+        semantic_num_queries=int(cfg.get("model", {}).get("semantic_num_queries", 4)),
     ).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=float(cfg["training"]["learning_rate"]))
     ckpt_dir = project / cfg["outputs"]["checkpoints"] / args.experiment
@@ -80,19 +101,28 @@ def main():
             oct_e = batch["oct_emb"].to(device)
             col_e = batch["col_emb"].to(device)
             fus_e = batch["fused_emb"].to(device)
+            sem_e = batch["semantic_emb"].to(device)
             instr = batch["instr"].to(device)
             ids = batch["input_ids"].to(device)
             tgt = batch["target_ids"].to(device)
             lab = batch["labels"].to(device)
             w = batch["weight"].to(device)
-            out = model(oct_e, col_e, fus_e, instr, ids, lab)
+            out = model(oct_e, col_e, fus_e, instr, ids, lab, semantic_emb=sem_e)
             ce = F.cross_entropy(out["logits"].reshape(-1, out["logits"].size(-1)), tgt.reshape(-1), reduction="none")
             ce = (ce.view(tgt.size(0), -1).mean(1) * w).mean()
             align = model.section_alignment_loss(out["fused"], out["hidden"])
+            semantic = model.semantic_retrieval_loss(out["fused"], out.get("semantic_projected"))
             risk = torch.tensor(0.0, device=device)
             if out.get("risk_logit") is not None:
                 risk = F.binary_cross_entropy_with_logits(out["risk_logit"].squeeze(-1), lab.float())
-            loss = float(cfg["loss"]["ce_weight"]) * ce + float(cfg["loss"]["rasa_weight"]) * align + float(cfg["loss"]["cls_weight"]) * risk
+            topic = _topic_aux_loss(out, batch, device)
+            loss = (
+                float(cfg["loss"]["ce_weight"]) * ce
+                + float(cfg["loss"]["rasa_weight"]) * align
+                + float(cfg["loss"]["cls_weight"]) * risk
+                + float(cfg["loss"].get("topic_weight", 0.0)) * topic
+                + float(cfg["loss"].get("semantic_weight", 0.0)) * semantic
+            )
             optim.zero_grad()
             loss.backward()
             optim.step()
@@ -106,7 +136,9 @@ def main():
     curve_dir = project / cfg["outputs"]["tables"] / args.experiment
     curve_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(history).to_csv(curve_dir / "training_curve.csv", index=False)
-    (project / cfg["outputs"]["logs"] / f"{args.experiment}_history.json").write_text(json.dumps(history), encoding="utf-8")
+    log_dir = project / cfg["outputs"]["logs"]
+    log_dir.mkdir(parents=True, exist_ok=True)
+    (log_dir / f"{args.experiment}_history.json").write_text(json.dumps(history), encoding="utf-8")
     print(f"Saved {best}")
 
 

@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.evaluation.metrics import label_consistency
 from src.evaluation_publishable.report_metrics import aggregate_metrics, compute_reference_metrics
-from src.models_publishable.lcad_rasa_model import PublishableLCADRASA, instr_vector, load_visual_emb
+from src.models_publishable.lcad_rasa_model import PublishableLCADRASA, instr_vector, load_semantic_emb, load_visual_emb, stable_token_id
 from src.training.publishable_dataset import PublishableDataset
 
 
@@ -26,13 +26,14 @@ def predict_text(model, row, device) -> str:
     oct_e = torch.tensor(load_visual_emb(str(row.get("oct_embedding_path", ""))), dtype=torch.float32).unsqueeze(0).to(device)
     col_e = torch.tensor(load_visual_emb(str(row.get("colposcopy_embedding_path", ""))), dtype=torch.float32).unsqueeze(0).to(device)
     fus_e = torch.tensor(load_visual_emb(str(row.get("fused_visual_embedding_path", ""))), dtype=torch.float32).unsqueeze(0).to(device)
+    sem_e = torch.tensor(load_semantic_emb(str(row.get("semantic_retrieval_embedding_path", ""))), dtype=torch.float32).unsqueeze(0).to(device)
     instr = torch.tensor(instr_vector(row.to_dict()), dtype=torch.float32).unsqueeze(0).to(device)
     ref = str(row.get("reference_report_text", row.get("training_report_text", "")))
-    ids = torch.tensor([[hash(w) % 8192 for w in ref.split()[:64]]], dtype=torch.long).to(device)
+    ids = torch.tensor([[stable_token_id(w, 8192) for w in ref.split()[:64]]], dtype=torch.long).to(device)
     if ids.size(1) < 64:
         ids = F.pad(ids, (0, 64 - ids.size(1)))
     with torch.no_grad():
-        out = model(oct_e, col_e, fus_e, instr, ids, torch.tensor([int(row["binary_label"])], device=device))
+        out = model(oct_e, col_e, fus_e, instr, ids, torch.tensor([int(row["binary_label"])], device=device), semantic_emb=sem_e)
     pred_ids = out["logits"].argmax(-1).squeeze().tolist()
     return " ".join(str(t) for t in pred_ids[:32])
 
@@ -47,9 +48,19 @@ def main():
     df = pd.read_csv(ROOT / args.manifest)
     test = df[df["split"] == "test"] if "split" in df.columns else df.iloc[:400]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = PublishableLCADRASA().to(device)
     state = torch.load(ROOT / args.checkpoint, map_location=device)
-    model.load_state_dict(state["model"])
+    model_state = state["model"]
+    topic_weight = model_state.get("topic_head.weight")
+    use_semantic = any(k.startswith("semantic_proj.") or k.startswith("semantic_token_packer.") for k in model_state)
+    if topic_weight is not None:
+        model = PublishableLCADRASA(
+            use_topic_head=True,
+            num_report_topics=int(topic_weight.shape[0]),
+            use_semantic_retrieval=use_semantic,
+        ).to(device)
+    else:
+        model = PublishableLCADRASA(use_semantic_retrieval=use_semantic).to(device)
+    model.load_state_dict(model_state, strict=False)
     model.eval()
     gen_dir = ROOT / args.output_dir / "generated_reports" / args.experiment
     gen_dir.mkdir(parents=True, exist_ok=True)

@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from src.models_publishable.lcad_rasa_model import instr_vector, load_visual_emb
+from src.models_publishable.lcad_rasa_model import instr_vector, load_semantic_emb, load_visual_emb, stable_token_id
 
 
 def _resolve_weight(row: pd.Series, weight_mode: str) -> float:
@@ -69,7 +69,7 @@ class PublishableDataset(Dataset):
         return len(self.indices)
 
     def _text_ids(self, text: str) -> torch.Tensor:
-        ids = [hash(w) % self.vocab_size for w in text.split()[: self.max_len]]
+        ids = [stable_token_id(w, self.vocab_size) for w in text.split()[: self.max_len]]
         ids += [0] * (self.max_len - len(ids))
         return torch.tensor(ids[: self.max_len], dtype=torch.long)
 
@@ -83,10 +83,13 @@ class PublishableDataset(Dataset):
             "oct_emb": torch.tensor(load_visual_emb(oct_p), dtype=torch.float32),
             "col_emb": torch.tensor(load_visual_emb(col_p), dtype=torch.float32),
             "fused_emb": torch.tensor(load_visual_emb(fus_p), dtype=torch.float32),
+            "semantic_emb": torch.tensor(load_semantic_emb(str(row.get("semantic_retrieval_embedding_path", ""))), dtype=torch.float32),
             "instr": torch.tensor(instr_vector(row.to_dict()), dtype=torch.float32),
             "input_ids": self._text_ids(text),
             "target_ids": self._text_ids(text),
             "labels": torch.tensor(int(row["binary_label"]), dtype=torch.long),
+            "report_topic_id": torch.tensor(int(row.get("report_topic_id", -1)), dtype=torch.long),
+            "report_topic_confidence": torch.tensor(float(row.get("report_topic_confidence", 0.0)), dtype=torch.float32),
             "weight": torch.tensor(
                 _resolve_weight(row, self.weight_mode) if self.use_report_loss else 1.0,
                 dtype=torch.float32,

@@ -66,18 +66,18 @@ API_PROVIDERS = [
 ]
 BASELINE_PROVIDERS = ["label_template", "rule_based", "local_llm"]
 MORANDI_HEX = [
-    "#576fa0",
-    "#a7b9d7",
-    "#e3b87f",
-    "#fadcb4",
-    "#b57979",
-    "#dea3a2",
-    "#9f9f9f",
-    "#cfcece",
+    "#2f5f8f",
+    "#8fb8d8",
+    "#d9a066",
+    "#efd7b5",
+    "#9e3f3a",
+    "#d47f6f",
+    "#7f7f7f",
+    "#d6d6d6",
 ]
 TEXT_DARK = "#3a3a3a"
-EDGE_DARK = "#9f9f9f"
-GRID_LINE = "#cfcece"
+EDGE_DARK = "#7f7f7f"
+GRID_LINE = "#d6d6d6"
 PROVIDER_LABELS = {
     "label_template": "Template",
     "rule_based": "Rule-based",

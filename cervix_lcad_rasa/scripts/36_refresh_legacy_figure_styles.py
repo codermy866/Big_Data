@@ -148,7 +148,7 @@ def main():
     replot_loco_strict_heatmap(project, fig_dir)
     replot_multiseed_boxplot(project, fig_dir)
     print(f"Legacy figures refreshed: {fig_dir}")
-    print("Font: Arial; palette: #576fa0 #a7b9d7 #e3b87f #fadcb4 #b57979 #dea3a2 #9f9f9f #cfcece")
+    print("Font: Arial; palette: #2f5f8f #8fb8d8 #d9a066 #efd7b5 #9e3f3a #d47f6f #7f7f7f #d6d6d6")
 
 
 if __name__ == "__main__":

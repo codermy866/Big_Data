@@ -36,32 +36,32 @@ PROVIDER_LABELS = {
     "aihubmix_gemini": "Gemini-3.1-Pro",
 }
 MORANDI_HEX = [
-    "#576fa0",
-    "#a7b9d7",
-    "#e3b87f",
-    "#fadcb4",
-    "#b57979",
-    "#dea3a2",
-    "#9f9f9f",
-    "#cfcece",
+    "#2f5f8f",
+    "#8fb8d8",
+    "#d9a066",
+    "#efd7b5",
+    "#9e3f3a",
+    "#d47f6f",
+    "#7f7f7f",
+    "#d6d6d6",
 ]
 MORANDI = sns.color_palette(MORANDI_HEX)
 MORANDI_SEQ = LinearSegmentedColormap.from_list(
-    "nature_seq_muted",
+    "cell_seq_blue",
     [
-        "#f7f6f0",
-        "#e7e1d4",
-        "#d4bf8b",
-        "#c28b73",
-        "#a65f6f",
-        "#6f5a86",
-        "#334a7d",
+        "#f7f7f2",
+        "#e4eef0",
+        "#c3dae6",
+        "#8fb8d8",
+        "#5d88b3",
+        "#2f5f8f",
+        "#1f3f64",
     ],
     N=256,
 )
 MORANDI_DIV = LinearSegmentedColormap.from_list(
-    "nature_div_muted",
-    ["#334a7d", "#7f98bf", "#dbe5ef", "#f7f6f0", "#e7c27f", "#c9796d", "#8b3f54"],
+    "cell_div_blue_red",
+    ["#1f3f64", "#8fb8d8", "#e4eef0", "#f7f7f2", "#d9a066", "#d47f6f", "#9e3f3a"],
     N=256,
 )
 

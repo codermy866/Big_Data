@@ -269,7 +269,7 @@ def prompt_f_main_figures() -> None:
         "\n## Main text (canonical paths under `figures/main/`)\n",
     ]
     captions = {
-        "Figure1_study_design.png": "Figure 1. Five-centre cohort, LCAD pseudo-report construction (local structured generator), and RASA section alignment with CIN2+ risk head. Not a commercial LLM API workflow.",
+        "Figure1_study_design.png": "Figure 1. MOSAIC framework overview: (A) multicentre cohort under report-supervision imbalance; (B) offline LCAD structured completion; (C) section-anchored RASA alignment; (D) train-only semantic retrieval and validation-calibrated fusion.",
         "Figure2_centre_supervision.png": "Figure 2. Centre-level case counts by real-report vs pseudo-report-candidate supervision (Table 1b).",
         "Figure3_perturbation.png": "Figure 3. Perturbation condition × report-section similarity (n=128 report-missing test cases). Masking induced section-specific degradation.",
         "Figure4_loco_strict.png": "Figure 4 (optional). Strict leave-one-centre-out AUROC by held-out centre and model. Training used a fixed quick budget; interpret as cross-centre behaviour analysis, not full external validation.",

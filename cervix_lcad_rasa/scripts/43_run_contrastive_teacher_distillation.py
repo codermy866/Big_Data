@@ -48,7 +48,7 @@ FULL_PRED = ROOT / "outputs/publishable/predictions/final_per_case/full_lcad_ras
 FULL_TABLE = ROOT / "outputs/publishable/tables/manuscript/T2_main_model_comparison_with_ci.csv"
 EXT_SCRIPT = ROOT / "scripts/42_run_external_baseline_block.py"
 
-PALETTE = ["#576fa0", "#a7b9d7", "#e3b87f", "#fadcb4", "#b57979", "#dea3a2", "#9f9f9f", "#cfcece"]
+PALETTE = ["#2f5f8f", "#8fb8d8", "#d9a066", "#efd7b5", "#9e3f3a", "#d47f6f", "#7f7f7f", "#d6d6d6"]
 
 
 def load_external_module():
