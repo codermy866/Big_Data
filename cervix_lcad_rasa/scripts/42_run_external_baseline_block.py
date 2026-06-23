@@ -76,7 +76,7 @@ def setup_theme() -> None:
             "ps.fonttype": 42,
             "svg.fonttype": "none",
             "font.family": "Arial",
-            "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
+            "font.sans-serif": ["Arial"],
             "axes.unicode_minus": False,
             "axes.spines.top": False,
             "axes.spines.right": False,
@@ -98,8 +98,11 @@ def setup_theme() -> None:
 
 def save_fig(fig: plt.Figure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path.with_suffix(".png"), bbox_inches="tight", dpi=300, facecolor="white")
-    fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white")
+    for ax in fig.get_axes():
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontfamily("Arial")
+    fig.savefig(path.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white", pad_inches=0.08)
+    fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white", pad_inches=0.08)
     plt.close(fig)
 
 
@@ -588,20 +591,25 @@ def build_figures(table: pd.DataFrame, paired: pd.DataFrame) -> None:
         palette=[PALETTE[0], PALETTE[2], PALETTE[4]],
         ax=ax,
     )
-    ax.set_xlabel("Metric value")
+    ax.set_xlabel("Metric value", fontfamily="Arial")
     ax.set_ylabel("")
-    ax.set_title("External baseline metric profile")
-    ax.legend(title="Metric", bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.set_xlim(0, 1)
+    ax.set_title("External baseline metric profile", fontfamily="Arial")
+    ax.legend(title="Metric", bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False)
+    ax.set_xlim(0, 1.02)
+    fig.subplots_adjust(right=0.78)
     sns.despine(fig=fig, ax=ax)
     fig.tight_layout()
     save_fig(fig, FIGURES / "Figure_external_baselines_metric_dotplot")
 
     if not paired.empty:
+        from src.supplementary.jbd_figure_stats import annotate_p_at_xy
+
         p = paired[paired["comparator"].str.contains("Clinical|OCT|Colposcopy|Late|Cross|Contrastive", regex=True)].copy()
         if not p.empty:
             p = p.sort_values("delta_auc_full_minus_comparator", ascending=True)
-            fig, ax = plt.subplots(figsize=(9.0, 4.8))
+            fig, ax = plt.subplots(figsize=(9.8, 5.0))
+            ci_max = float(p["delta_auc_ci_high"].max())
+            label_x = ci_max + 0.018
             for i, (_, r) in enumerate(p.iterrows()):
                 ax.plot([r["delta_auc_ci_low"], r["delta_auc_ci_high"]], [i, i], color="#343434", lw=1.5)
                 ax.scatter(
@@ -613,9 +621,19 @@ def build_figures(table: pd.DataFrame, paired: pd.DataFrame) -> None:
                     linewidth=0.8,
                     zorder=3,
                 )
+                annotate_p_at_xy(
+                    ax,
+                    label_x,
+                    i,
+                    float(r.get("paired_bootstrap_p_two_sided", np.nan)),
+                    ha="left",
+                    va="center",
+                    fontsize=9,
+                )
             ax.axvline(0, ls="--", color="#7f7f7f", lw=1.2)
             ax.set_yticks(range(len(p)))
             ax.set_yticklabels(p["comparator"].tolist())
+            ax.set_xlim(float(p["delta_auc_ci_low"].min()) - 0.03, label_x + 0.10)
             ax.set_xlabel("Paired bootstrap delta AUROC (Full LCAD-RASA - comparator)")
             ax.set_title("Corrected paired bootstrap recheck")
             sns.despine(fig=fig, ax=ax)

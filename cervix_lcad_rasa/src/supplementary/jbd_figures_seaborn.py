@@ -19,117 +19,129 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from src.supplementary.jbd_figure_typography import FONT_ARIAL, apply_arial_to_figure, setup_arial_rcparams
+
 MANUSCRIPT_REL = "outputs/publishable/tables/manuscript"
 PRED_REL = "outputs/publishable/predictions/final_per_case"
 TABLES_REL = "outputs/publishable/tables"
 
-# Cell Press-inspired manuscript palette (blue, cream, brick red, neutral grey).
+# Journal palette requested for the JBD revision.
+# Warm categorical colors support framework / mechanism figures, while cool
+# continuous scales are reserved for heatmaps and matrix-valued diagnostics.
+JBD_WARM_CATEGORICAL = [
+    "#3E3425",
+    "#998560",
+    "#ADB093",
+    "#E1CA9E",
+]
+JBD_COOL_CATEGORICAL = [
+    "#1E3A66",
+    "#4F8FD6",
+    "#C5B5E8",
+    "#E76B6B",
+]
+JBD_VIEWING_SCALE = [
+    "#FBF3E6",
+    "#E1CA9E",
+    "#ADB093",
+    "#998560",
+    "#3E3425",
+]
 JBD_PALETTE_HEX = [
-    "#2f5f8f",
-    "#8fb8d8",
-    "#d9a066",
-    "#efd7b5",
-    "#9e3f3a",
-    "#d47f6f",
-    "#7f7f7f",
-    "#d6d6d6",
+    "#3E3425",  # C0 dark brown — primary text / strong category
+    "#998560",  # C1 ochre — emphasis category
+    "#ADB093",  # C2 sage — auxiliary category
+    "#E1CA9E",  # C3 light module / soft category
+    "#1E3A66",  # C4 deep blue — primary model highlight
+    "#4F8FD6",  # C5 mid blue — secondary model / cool accent
+    "#C5B5E8",  # C6 lavender — tertiary accent
+    "#E76B6B",  # C7 muted red — negative / contrast
 ]
 PALETTE_MAIN = sns.color_palette(JBD_PALETTE_HEX)
 C0, C1, C2, C3, C4, C5, C6, C7 = JBD_PALETTE_HEX
-PALETTE_SUPERVISION = [C0, C2]  # real report vs pseudo-report candidate
-PALETTE_BINARY = [C0, C4]  # negative vs positive (CIN2+)
-TEXT_DARK = "#3a3a3a"
-EDGE_DARK = C6
-GRID_LINE = C7
+PALETTE_SUPERVISION = [C0, C3]  # real report vs pseudo-report candidate
+PALETTE_BINARY = [C5, C7]  # negative vs positive (CIN2+)
+TEXT_DARK = "#3E3425"
+EDGE_DARK = "#3E3425"
+GRID_LINE = "#E1CA9E"
+FIG_FACE = "#FBF3E6"
 NATURE_HEATMAP_SEQ = [
-    "#f7f7f2",
-    "#eef4f3",
-    "#e1ecef",
-    "#d4e5eb",
-    "#c3dae6",
-    "#abcade",
-    "#8fb8d8",
-    "#6f9bc3",
-    "#5d88b3",
-    "#4775a2",
-    "#2f5f8f",
-    "#1f3f64",
+    "#F7F8FB",
+    "#8FA6E3",
+    "#4F8FD6",
+    "#1E3A66",
 ]
 NATURE_HEATMAP_DIV = [
-    "#2f6f9f",
-    "#7faac0",
-    "#d9e8e6",
-    "#f8f4ec",
-    "#efc7ad",
-    "#d68572",
-    "#b95750",
+    "#E76B6B",
+    "#F2D6A6",
+    "#F7F8FB",
+    "#8FA6E3",
+    "#1E3A66",
 ]
 PALETTE_MODEL = {
-    "Full LCAD-RASA": C0,
+    "Full LCAD-RASA": C4,
     "Pseudo-augmented (LCAD)": C2,
     "LCAD w/o section alignment": C5,
-    "Real-report only": C4,
+    "Real-report only": C1,
     "Simple concat fusion": C6,
     "Image-only report gen.": C1,
     "Instruction-only report gen.": C7,
     "Fusion w/o report anchor": C3,
     "Simple concat": C6,
     "LCAD w/o section": C5,
+    "MOSAIC (full)": C7,
+    "MOSAIC--RASA backbone": C4,
+    "Semantic retrieval only": C2,
 }
 
 
 def _cmap_sequential() -> object:
     from matplotlib.colors import ListedColormap
 
-    return ListedColormap(NATURE_HEATMAP_SEQ, name="cell_seq_blue")
+    return ListedColormap(NATURE_HEATMAP_SEQ, name="jbd_botanical_seq")
 
 
 def _cmap_diverging() -> object:
     from matplotlib.colors import LinearSegmentedColormap
 
-    return LinearSegmentedColormap.from_list("cell_div_blue_red", NATURE_HEATMAP_DIV, N=256)
+    return LinearSegmentedColormap.from_list("jbd_botanical_div", NATURE_HEATMAP_DIV, N=256)
 
 
 def _setup_theme() -> None:
-    sns.set_theme(
-        style="whitegrid",
-        context="talk",
-        font="Arial",
-        font_scale=1.0,
-        palette=PALETTE_MAIN,
-        rc={
-            "figure.dpi": 120,
-            "savefig.dpi": 300,
-            "pdf.fonttype": 42,
-            "ps.fonttype": 42,
-            "svg.fonttype": "none",
-            "font.family": "Arial",
-            "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
-            "mathtext.fontset": "stix",
-            "axes.unicode_minus": False,
+    setup_arial_rcparams(
+        {
             "axes.spines.top": False,
             "axes.spines.right": False,
             "axes.titleweight": "bold",
             "axes.labelweight": "bold",
-            "axes.titlesize": 16,
-            "axes.labelsize": 13,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 11,
-            "legend.fontsize": 10,
-            "grid.alpha": 0.4,
+            "axes.titlesize": 10,
+            "axes.labelsize": 9,
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            "legend.fontsize": 8,
+            "font.size": 8,
+            "grid.alpha": 0.35,
             "grid.color": GRID_LINE,
             "axes.edgecolor": EDGE_DARK,
             "axes.labelcolor": TEXT_DARK,
             "text.color": TEXT_DARK,
-        },
+        }
+    )
+    sns.set_theme(
+        style="whitegrid",
+        context="paper",
+        font=FONT_ARIAL,
+        font_scale=1.0,
+        palette=PALETTE_MAIN,
     )
 
 
 def _save(fig: plt.Figure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white")
+    apply_arial_to_figure(fig)
+    fig.savefig(path.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white", pad_inches=0.06)
     try:
-        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white")
+        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white", pad_inches=0.06)
     except Exception:
         pass
     plt.close(fig)
@@ -149,11 +161,9 @@ def _model_palette(df: pd.DataFrame, col: str = "model") -> dict:
 
 
 def _p_label(p: float | None) -> str:
-    if p is None or pd.isna(p):
-        return "n.s."
-    if p < 0.0001:
-        return "<0.0001"
-    return f"{p:.4f}"
+    from src.supplementary.jbd_figure_stats import format_pvalue
+
+    return format_pvalue(p)
 
 
 def _add_bracket(ax: plt.Axes, x1: float, x2: float, y: float, text: str, h: float = 0.025) -> None:
@@ -219,9 +229,12 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
     fig, (ax_scatter, ax_cover) = plt.subplots(
         1,
         2,
-        figsize=(12.2, 5.35),
-        gridspec_kw={"width_ratios": [1.04, 1.08], "wspace": 0.34},
+        figsize=(12.9, 5.75),
+        gridspec_kw={"width_ratios": [1.04, 1.12], "wspace": 0.42},
     )
+    fig._jbd_font_scale_override = 1.12
+    fig._jbd_min_font_size_override = 7.6
+    fig._jbd_max_font_size_override = 18.0
 
     max_cases = int(np.ceil(data["Cases"].max() / 100) * 100)
     for total in [100, 300, 500]:
@@ -235,14 +248,25 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
                 alpha=0.72,
                 zorder=0,
             )
-            ax_scatter.text(total * 0.56, total * 0.44, f"{total} cases", fontsize=7.7, color=TEXT_DARK, rotation=-35, alpha=0.75)
+            ax_scatter.text(
+                total * 0.62,
+                total * 0.38,
+                f"{int(total)} cases",
+                fontsize=7.5,
+                color=TEXT_DARK,
+                fontfamily=FONT_ARIAL,
+                ha="left",
+                va="bottom",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.82),
+            )
     label_offsets = {
-        "Xiangyang": (18, 15),
-        "Shiyan": (18, -23),
-        "Wuda": (12, 10),
-        "Jingzhou": (12, 6),
-        "Enshi": (12, 8),
+        "Xiangyang": (35, 38),
+        "Shiyan": (-12, -55),
+        "Wuda": (14, 12),
+        "Jingzhou": (14, 8),
+        "Enshi": (14, 10),
     }
+    annotate_centres = {"Shiyan", "Xiangyang"}
     for _, row in data.iterrows():
         color = centre_colors[row["Centre label"]]
         ax_scatter.scatter(
@@ -255,12 +279,30 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
             alpha=0.94,
             zorder=3,
         )
-        dx, dy = label_offsets.get(row["Centre label"], (12, 8))
+        centre = row["Centre label"]
+        if centre in annotate_centres:
+            dx, dy = label_offsets[centre]
+            ax_scatter.annotate(
+                centre,
+                xy=(row["Real reports"], row["Pseudo-report candidates"]),
+                xytext=(dx, dy),
+                textcoords="offset points",
+                ha="left" if centre == "Xiangyang" else "right",
+                va="center",
+                fontsize=8.8,
+                fontweight="bold",
+                color=TEXT_DARK,
+                arrowprops=dict(arrowstyle="-", color=TEXT_DARK, lw=0.55, shrinkA=4, shrinkB=2),
+                zorder=7,
+                clip_on=False,
+            )
+            continue
+        dx, dy = label_offsets.get(centre, (12, 8))
         ha = "left" if dx > 0 else "right"
         ax_scatter.text(
             row["Real reports"] + dx,
             row["Pseudo-report candidates"] + dy,
-            row["Centre label"],
+            centre,
             ha=ha,
             va="bottom",
             fontsize=8.8,
@@ -283,8 +325,8 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
     sns.despine(fig=fig, ax=ax_scatter)
 
     y_positions = np.arange(len(data))
-    real_count_x = 1.16
-    pseudo_count_x = 1.32
+    real_count_x = 1.14
+    pseudo_count_x = 1.37
     for y, (_, row) in zip(y_positions, data.iterrows()):
         color = centre_colors[row["Centre label"]]
         if y % 2 == 1:
@@ -328,13 +370,13 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
         )
     ax_cover.axvline(0.5, color=EDGE_DARK, linestyle=(0, (2, 2)), linewidth=0.9, alpha=0.65)
     ax_cover.axvline(1.08, color=C7, linestyle=(0, (2, 2)), linewidth=0.9, alpha=0.85)
-    ax_cover.text(real_count_x, -0.72, "Real\nreports", ha="center", va="bottom", fontsize=8.3, fontweight="bold", color=TEXT_DARK, clip_on=False)
-    ax_cover.text(pseudo_count_x, -0.72, "Pseudo\ncandidates", ha="center", va="bottom", fontsize=8.3, fontweight="bold", color=TEXT_DARK, clip_on=False)
+    ax_cover.text(real_count_x, -0.82, "Real\nreports", ha="center", va="bottom", fontsize=7.6, fontweight="bold", color=TEXT_DARK, clip_on=False, linespacing=1.05)
+    ax_cover.text(pseudo_count_x, -0.82, "Pseudo\ncases", ha="center", va="bottom", fontsize=7.6, fontweight="bold", color=TEXT_DARK, clip_on=False, linespacing=1.05)
     ax_cover.set_yticks(y_positions)
     ax_cover.set_yticklabels(data["Centre label"], fontsize=9.4)
-    ax_cover.set_xlim(-0.12, 1.40)
+    ax_cover.set_xlim(-0.12, 1.48)
     ax_cover.set_ylim(len(data) - 0.5, -0.5)
-    ax_cover.set_xlabel("Real-report coverage")
+    ax_cover.set_xlabel("Real-report coverage", labelpad=10)
     ax_cover.set_title("Coverage and report counts by centre", fontsize=11.2, fontweight="bold")
     ax_cover.set_xticks(np.linspace(0, 1, 6))
     ax_cover.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(round(x * 100))}%"))
@@ -347,14 +389,14 @@ def fig02_centre_supervision(project: Path, out_dir: Path) -> None:
     fig.suptitle("Centre-level cohort scale and report-supervision imbalance", fontsize=14.4, fontweight="bold", y=0.975)
     fig.text(
         0.985,
-        0.035,
+        0.018,
         "Bubble size encodes total OCT + colposcopy image volume.",
         ha="right",
         va="center",
-        fontsize=8.0,
+        fontsize=7.4,
         color=TEXT_DARK,
     )
-    fig.subplots_adjust(left=0.085, right=0.985, top=0.86, bottom=0.15)
+    fig.subplots_adjust(left=0.085, right=0.975, top=0.85, bottom=0.22)
     _save(fig, out_dir / "Figure2_centre_supervision_catplot")
 
     long = data.melt(
@@ -460,8 +502,8 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
         )
         for _, row in g.iterrows():
             if float(row["similarity"]) < 0.55:
-                ax.text(float(row["similarity"]) + 0.035, float(row["y"]), f"{float(row['similarity']):.2f}", va="center", fontsize=8.5, fontweight="bold", color=TEXT_DARK)
-        ax.set_xlim(0, 1.08)
+                ax.text(1.02, float(row["y"]), f"{float(row['similarity']):.2f}", va="center", ha="left", fontsize=8.5, fontweight="bold", color=TEXT_DARK, fontfamily=FONT_ARIAL, clip_on=False)
+        ax.set_xlim(0, 1.18)
         ax.set_title(section.title(), fontsize=11.5, fontweight="bold")
         ax.set_xlabel("Similarity")
         ax.grid(axis="x", alpha=0.30)
@@ -488,6 +530,8 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
         colors = [C4 if v > 0.25 else C2 if v > 0.10 else C0 for v in r["abs_delta"]]
         ax.axvline(normal_mean, color=TEXT_DARK, lw=1.1, ls=(0, (2, 2)), alpha=0.70, zorder=1)
         ax.axvspan(normal_mean - 0.015, normal_mean + 0.015, color=C7, alpha=0.25, zorder=0)
+        xmax = float(r["mean_risk_score"].max())
+        label_x = min(0.58, xmax + 0.085)
         for yi, (_, row), color in zip(y, r.iterrows(), colors):
             perturbed = float(row["mean_risk_score"])
             delta = float(row["risk_score_delta_vs_normal"])
@@ -495,19 +539,21 @@ def fig03_perturbation(project: Path, out_dir: Path) -> None:
             ax.scatter(normal_mean, yi, marker="o", s=68, facecolor="white", edgecolor=TEXT_DARK, linewidth=1.1, zorder=4)
             ax.scatter(perturbed, yi, marker="D", s=100, facecolor=color, edgecolor=TEXT_DARK, linewidth=0.85, zorder=5)
             ax.text(
-                perturbed + 0.010,
+                label_x,
                 yi,
-                f"{perturbed:.3f}  ({delta:+.3f})",
+                f"{perturbed:.3f} ({delta:+.3f})",
                 ha="left",
                 va="center",
-                fontsize=9.0,
+                fontsize=8.8,
+                fontfamily=FONT_ARIAL,
                 fontweight="bold" if row["condition"] == "label_only_inference" else "normal",
                 color=TEXT_DARK,
+                clip_on=False,
             )
         ax.set_yticks(y)
         ax.set_yticklabels(r["condition_label"], fontsize=10.5)
         ax.invert_yaxis()
-        ax.set_xlim(max(0.0, normal_mean - 0.04), min(0.58, float(r["mean_risk_score"].max()) + 0.075))
+        ax.set_xlim(max(0.0, normal_mean - 0.04), label_x + 0.10)
         ax.set_xlabel("Mean risk score (open circles mark normal input)")
         ax.set_ylabel("")
         ax.set_title("Risk-score displacement under perturbation", fontsize=16, fontweight="bold")
@@ -567,15 +613,21 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
             if "f1" in plot_df.columns:
                 ax.scatter(xi + 0.16, row["f1"], marker="^", s=48, color=C4, edgecolor=EDGE_DARK, linewidth=0.7, zorder=4)
         pvals: dict[str, float] = {}
-        pw = _read(project, f"{MANUSCRIPT_REL}/T2_pairwise_statistical_tests.csv")
-        if pw is not None and "comparator" in pw.columns:
-            for _, r in pw.iterrows():
-                pvals[str(r["comparator"])] = float(r.get("bootstrap_p_auc", np.nan))
+        from src.supplementary.jbd_figure_stats import load_comparator_pvals
+
+        pvals = load_comparator_pvals(project)
         full_idx = plot_df.index[plot_df["model"].eq("Full LCAD-RASA")].tolist()
         if full_idx:
             x_full = list(plot_df.index).index(full_idx[0])
             y0 = min(1.02, float(plot_df["auc"].max()) + 0.04)
-            for level, target in enumerate(["Pseudo-augmented (LCAD)", "Real-report only", "Simple concat fusion"]):
+            bracket_targets = [
+                "Pseudo-augmented (LCAD)",
+                "Real-report only",
+                "Simple concat fusion",
+                "LCAD w/o section alignment",
+                "Instruction-only report gen.",
+            ]
+            for level, target in enumerate(bracket_targets):
                 hit = plot_df.index[plot_df["model"].eq(target)].tolist()
                 if hit:
                     xt = list(plot_df.index).index(hit[0])
@@ -585,7 +637,7 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
         ax.set_ylabel("Score")
         ax.set_xlabel("")
         ax.set_title("Main model comparison with bootstrap intervals")
-        ax.set_ylim(0, 1.20)
+        ax.set_ylim(0, 1.32)
         ax.axhline(0.5, color=C6, ls=":", lw=1, alpha=0.75)
         ax.scatter([], [], marker="o", color=C0, edgecolor=EDGE_DARK, label="AUROC")
         ax.scatter([], [], marker="^", color=C4, edgecolor=EDGE_DARK, label="F1")
@@ -593,22 +645,72 @@ def fig_main_model_comparison(project: Path, out_dir: Path) -> None:
         fig.tight_layout()
         _save(fig, out_dir / "Figure_main_AUC_pointplot")
 
-    # Metrics heatmap
+    # Metrics profile — grouped horizontal bars (avoid duplicating heatmaps used elsewhere).
     mcols = [c for c in ["auc", "f1", "sensitivity", "specificity"] if c in t2.columns]
     if mcols:
         hm = t2.set_index("model")[mcols]
-        fig, ax = plt.subplots(figsize=(7, 4 + 0.35 * len(hm)))
-        sns.heatmap(hm, annot=True, fmt=".3f", cmap=_cmap_diverging(), center=0.5, vmin=0, vmax=1, ax=ax, cbar_kws={"label": "Score"})
+        long = hm.reset_index().melt(id_vars="model", var_name="metric", value_name="score")
+        metric_labels = {"auc": "AUROC", "f1": "F1", "sensitivity": "Sensitivity", "specificity": "Specificity"}
+        long["metric"] = long["metric"].map(metric_labels).fillna(long["metric"])
+        order = t2["model"].tolist()
+        fig, ax = plt.subplots(figsize=(8.2, 4 + 0.28 * len(order)))
+        sns.barplot(
+            data=long,
+            y="model",
+            x="score",
+            hue="metric",
+            order=order,
+            hue_order=[metric_labels.get(c, c) for c in mcols],
+            palette=PALETTE_MAIN[: len(mcols)],
+            orient="h",
+            edgecolor=EDGE_DARK,
+            linewidth=0.8,
+            alpha=0.88,
+            ax=ax,
+        )
+        sns.stripplot(
+            data=long,
+            y="model",
+            x="score",
+            hue="metric",
+            order=order,
+            hue_order=[metric_labels.get(c, c) for c in mcols],
+            dodge=True,
+            marker="D",
+            size=5,
+            linewidth=0.6,
+            edgecolor=EDGE_DARK,
+            palette=PALETTE_MAIN[: len(mcols)],
+            ax=ax,
+            legend=False,
+        )
+        ax.set_xlim(0, 1.02)
+        ax.set_xlabel("Score")
+        ax.set_ylabel("")
         ax.set_title("Multi-metric profile (validation-selected threshold)")
+        ax.legend(title="Metric", bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False)
         fig.tight_layout()
         _save(fig, out_dir / "Figure_main_metrics_heatmap")
 
-    # F1 vs AUC scatter (joint-style)
+    # F1 vs AUC scatter (joint-style) with pooled p annotation
     if "f1" in t2.columns and "auc" in t2.columns:
         fig, ax = plt.subplots(figsize=(8.2, 6))
-        sns.scatterplot(data=t2, x="auc", y="f1", hue="model", s=180, palette=_model_palette(t2), ax=ax, edgecolor=C7, linewidth=0.8)
-        for _, r in t2.iterrows():
-            ax.annotate(r["model"].split()[0], (r["auc"], r["f1"]), fontsize=7, alpha=0.8, xytext=(4, 4), textcoords="offset points")
+        sns.scatterplot(data=t2, x="auc", y="f1", hue="model", s=180, palette=_model_palette(t2), ax=ax, edgecolor=C7, linewidth=0.8, legend="brief")
+        from src.supplementary.jbd_figure_stats import format_pvalue, load_comparator_pvals
+
+        pvals = load_comparator_pvals(project)
+        ax.text(
+            0.03,
+            0.97,
+            f"vs Full LCAD-RASA (paired bootstrap):\nReal-report only {format_pvalue(pvals.get('Real-report only'))}\nSimple concat {format_pvalue(pvals.get('Simple concat fusion'))}",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=8,
+            fontfamily=FONT_ARIAL,
+            bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="#d0d0d0", alpha=0.92),
+        )
+        ax.legend(title="Model", bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=7, title_fontsize=7, frameon=False)
         ax.set_xlim(0.3, 0.9)
         ax.set_xlabel("AUROC")
         ax.set_ylabel("F1 score")
@@ -794,6 +896,7 @@ def supp_loco(project: Path, out_dir: Path) -> None:
     center_to_y = {c: i for i, c in enumerate(center_summary["center_label"])}
 
     fig, axes = plt.subplots(1, len(model_order), figsize=(11.4, 5.4), sharey=True)
+    label_x = 1.06
     for ax, model_label in zip(axes, model_order):
         sub = s2[s2["model_short"].eq(model_label)].copy()
         sub["y"] = sub["center_label"].map(center_to_y).astype(float)
@@ -812,17 +915,19 @@ def supp_loco(project: Path, out_dir: Path) -> None:
         )
         for _, row in sub.iterrows():
             ax.text(
-                float(row["auc"]) + 0.025,
+                label_x,
                 float(row["y"]),
                 f"{float(row['auc']):.3f}",
                 ha="left",
                 va="center",
-                fontsize=9.2,
+                fontsize=9.0,
+                fontfamily=FONT_ARIAL,
                 fontweight="bold" if model_label == "Full LCAD-RASA" else "normal",
                 color=TEXT_DARK,
+                clip_on=False,
             )
         ax.set_title(model_label, fontsize=12.5, fontweight="bold", color=TEXT_DARK)
-        ax.set_xlim(0.25, 1.08)
+        ax.set_xlim(0.25, label_x + 0.08)
         ax.set_xlabel("AUROC")
         ax.grid(axis="x", alpha=0.30)
         ax.grid(axis="y", color=GRID_LINE, alpha=0.45)
@@ -843,20 +948,24 @@ def supp_loco(project: Path, out_dir: Path) -> None:
     fig, ax = plt.subplots(figsize=(9.8, 5.9))
     ax.axvspan(0.25, 0.50, color=C4, alpha=0.08, zorder=0)
     ax.axvline(0.50, color=TEXT_DARK, lw=1.2, ls=(0, (2, 2)), alpha=0.78, zorder=1)
-    ax.text(0.505, len(center_summary) - 0.25, "chance", ha="left", va="center", fontsize=9.5, color=TEXT_DARK)
+    range_x = 1.12
+    auc_label_x = 1.02
+    ax.text(0.505, len(center_summary) - 0.25, "chance", ha="left", va="center", fontsize=9.5, color=TEXT_DARK, fontfamily=FONT_ARIAL)
     for _, row in center_summary.iterrows():
         y = center_to_y[row["center_label"]]
         ax.hlines(y, row["min_auc"], row["max_auc"], color=C7, lw=9, alpha=0.88, zorder=1)
         ax.hlines(y, row["min_auc"], row["max_auc"], color=EDGE_DARK, lw=1.1, alpha=0.52, zorder=2)
         ax.text(
-            1.035,
+            range_x,
             y,
             f"range {row['max_auc'] - row['min_auc']:.3f}",
             ha="left",
             va="center",
-            fontsize=9.4,
+            fontsize=9.2,
+            fontfamily=FONT_ARIAL,
             color=TEXT_DARK,
             fontweight="bold" if row["max_auc"] - row["min_auc"] > 0.20 else "normal",
+            clip_on=False,
         )
     for model_label in model_order:
         sub = s2[s2["model_short"].eq(model_label)].copy()
@@ -876,14 +985,16 @@ def supp_loco(project: Path, out_dir: Path) -> None:
     for _, row in s2[s2["model_short"].eq("Full LCAD-RASA")].iterrows():
         y = center_to_y[row["center_label"]] + model_offsets["Full LCAD-RASA"]
         ax.text(
-            float(row["auc"]) + 0.018,
+            auc_label_x,
             y,
             f"{float(row['auc']):.3f}",
             ha="left",
             va="center",
             fontsize=9.0,
+            fontfamily=FONT_ARIAL,
             fontweight="bold",
             color=C0,
+            clip_on=False,
         )
     y_labels = [
         f"{row['center_label']}  (n={int(row['test_cases'])})"
@@ -891,7 +1002,7 @@ def supp_loco(project: Path, out_dir: Path) -> None:
     ]
     ax.set_yticks(np.arange(len(center_summary)))
     ax.set_yticklabels(y_labels, fontsize=10.8)
-    ax.set_xlim(0.25, 1.13)
+    ax.set_xlim(0.25, range_x + 0.10)
     ax.set_ylim(-0.55, len(center_summary) - 0.35)
     ax.set_xlabel("AUROC under strict leave-one-centre-out retraining")
     ax.set_ylabel("")
@@ -953,13 +1064,13 @@ def supp_lambda_sweep(project: Path, out_dir: Path) -> None:
         label="Best observed setting",
     )
     ax.annotate(
-        rf"best $\lambda_{{align}}$={best['lambda_align']:.2f}" + "\n" + rf"AUROC={best['auc']:.3f}; $\Delta$={float(best['auc'] - baseline):+.3f}",
+        f"best lambda={best['lambda_align']:.2f}\nAUROC={best['auc']:.3f}; delta={float(best['auc'] - baseline):+.3f}",
         xy=(x[best_idx], float(best["auc"])),
-        xytext=(24, 22),
-        textcoords="offset points",
-        ha="left",
+        xytext=(x[best_idx] - 1.35, float(best["auc"]) + 0.010),
+        ha="right",
         va="bottom",
-        fontsize=10.5,
+        fontsize=10.0,
+        fontfamily=FONT_ARIAL,
         fontweight="bold",
         bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=C2, lw=1.0, alpha=0.96),
         arrowprops=dict(arrowstyle="-|>", color=C2, lw=1.2, shrinkA=4, shrinkB=4),

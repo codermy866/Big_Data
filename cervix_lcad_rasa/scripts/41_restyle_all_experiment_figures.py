@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.supplementary.jbd_ablation_figures import generate_all_ablation_figures
+from src.supplementary.jbd_result_visualization_figures import generate_result_visualization_figures
 from src.supplementary.jbd_figures_seaborn import (
     C0,
     C1,
@@ -90,10 +91,13 @@ def _style_axis(ax: plt.Axes) -> None:
 
 
 def _save_to_many(fig: plt.Figure, stems: list[Path]) -> None:
+    from src.supplementary.jbd_figure_typography import apply_arial_to_figure
+
+    apply_arial_to_figure(fig)
     for stem in stems:
         stem.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white")
-        fig.savefig(stem.with_suffix(".pdf"), bbox_inches="tight", facecolor="white")
+        fig.savefig(stem.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white", pad_inches=0.08)
+        fig.savefig(stem.with_suffix(".pdf"), bbox_inches="tight", facecolor="white", pad_inches=0.08)
     plt.close(fig)
 
 
@@ -172,7 +176,7 @@ def _tile_heatmap(
     row_max_chars = 42 if n_rows <= 12 else 30
     row_labels = [_compact_row_label(i)[:row_max_chars] for i in m.index]
     lim = group_r + group_w + 0.24
-    outer_band_colors = ["#6e87bd", "#cf8fa9", "#b8bfd8", "#bc8b7a", "#8ab7c4", "#d9a17c", "#9aa7b8", "#d7c6d6"]
+    outer_band_colors = [C0, C1, C2, C3, C4, C5, C6, C7]
     annotate_values = (n_rows * n_cols) <= 120 and sector >= 18.0
 
     def _xy(angle_deg: float, radius: float) -> tuple[float, float]:
@@ -703,59 +707,16 @@ def _restyle_theme1() -> list[Path]:
 
 
 def _restyle_matrix_outputs() -> list[Path]:
-    """Refresh matrix-style files as annotated tile heatmaps while preserving paths."""
+    """Refresh selected matrix-style figures with non-heatmap plot types where needed."""
     written: list[Path] = []
     fig_dir = ROOT / "outputs/publishable/figures"
     jbd_dir = fig_dir / "jbd_final"
     main_dir = fig_dir / "main"
     tables = ROOT / "outputs/publishable/tables/manuscript"
 
-    # Main multi-metric model profile.
-    t2 = _read(tables / "T2_main_model_comparison_with_ci.csv")
-    if t2 is not None and not t2.empty:
-        mcols = [c for c in ["auc", "f1"] if c in t2.columns]
-        if {"auc", "f1"}.issubset(t2.columns):
-            extra = [c for c in ["sensitivity", "specificity"] if c in t2.columns]
-            mcols = ["auc", "f1"] + extra
-        matrix = t2.set_index(t2["model"].map(_pretty_model))[mcols].rename(columns={"auc": "AUROC", "f1": "F1", "sensitivity": "Sensitivity", "specificity": "Specificity"})
-        _tile_heatmap(matrix, [jbd_dir / "Figure_main_metrics_heatmap"], "Main model metric profile", "Score", 0, 1, figsize=(8.6, 5.8))
-        written.append(jbd_dir / "Figure_main_metrics_heatmap.png")
-
-    # Main perturbation matrix.
-    s6 = _read(tables / "S6_modality_perturbation_text_decoding.csv")
-    if s6 is not None and not s6.empty:
-        conds = ["normal", "mask_oct", "mask_colposcopy", "mask_instruction", "mask_visual", "label_only_inference"]
-        cols = [
-            "oct_findings_similarity_to_normal",
-            "colposcopy_findings_similarity_to_normal",
-            "clinical_context_similarity_to_normal",
-            "impression_similarity_to_normal",
-        ]
-        use = s6[s6["condition"].isin(conds)].copy()
-        if set(cols).issubset(use.columns):
-            matrix = use.set_index("condition")[cols].rename(
-                index={
-                    "normal": "Normal",
-                    "mask_oct": "Mask OCT",
-                    "mask_colposcopy": "Mask colposcopy",
-                    "mask_instruction": "Mask clinical",
-                    "mask_visual": "Mask visual",
-                    "label_only_inference": "Label-only",
-                },
-                columns={
-                    "oct_findings_similarity_to_normal": "OCT findings",
-                    "colposcopy_findings_similarity_to_normal": "Colposcopy findings",
-                    "clinical_context_similarity_to_normal": "Clinical context",
-                    "impression_similarity_to_normal": "Impression",
-                },
-            )
-            stems = [
-                jbd_dir / "Figure3_modality_perturbation_heatmap",
-                fig_dir / "Figure3_modality_perturbation_heatmap",
-                main_dir / "Figure3_perturbation",
-            ]
-            _tile_heatmap(matrix, stems, "Perturbation response by report section", "Similarity to normal", 0, 1, figsize=(8.8, 4.8))
-            written.extend([p.with_suffix(".png") for p in stems])
+    # Main multi-metric profile is generated as grouped bars in jbd_figures_seaborn.
+    # Main perturbation matrix is generated as sns.heatmap in fig03_perturbation.
+    # API P1/P4/P8 are generated in scripts 39/40 with boxen, stacked bar, and faceted bars.
 
     # LOCO AUROC matrix.
     s2 = _read(tables / "S2_loco_strict_retrain.csv")
@@ -817,24 +778,7 @@ def _restyle_matrix_outputs() -> list[Path]:
         _save_to_many(fig, stems)
         written.extend([p.with_suffix(".png") for p in stems])
 
-    # Extended perturbation dependency matrix.
-    s6b = _read(tables / "S6b_modality_perturbation_extended.csv")
-    if s6b is None:
-        s6b = _read(ROOT / "outputs/publishable/tables/table_modality_perturbation_extended.csv")
-    if s6b is not None and not s6b.empty:
-        cols = [c for c in ["eds_oct_findings", "eds_colposcopy_findings", "eds_clinical_context", "risk_delta"] if c in s6b.columns]
-        if cols and "condition" in s6b.columns:
-            matrix = s6b.head(20).set_index("condition")[cols].abs().rename(
-                columns={
-                    "eds_oct_findings": "OCT EDS",
-                    "eds_colposcopy_findings": "Colposcopy EDS",
-                    "eds_clinical_context": "Clinical EDS",
-                    "risk_delta": "Risk shift",
-                }
-            )
-            stems = [fig_dir / "fig_perturbation_section_dependency_heatmap", fig_dir / "fig_perturbation_clustermap"]
-            _tile_heatmap(matrix, stems, "Extended perturbation sensitivity", "Absolute shift", 0, max(1.0, float(matrix.max().max())), figsize=(9.4, 7.4), max_label_chars=30)
-            written.extend([p.with_suffix(".png") for p in stems])
+    # Extended perturbation clustermap is generated in jbd_figures_seaborn.supp_perturbation_extended.
 
     # Ablation summary matrix.
     frames = []
@@ -847,40 +791,19 @@ def _restyle_matrix_outputs() -> list[Path]:
         frames.append(d[["block_label", "auc", "f1"]])
     if frames:
         matrix = pd.concat(frames, ignore_index=True).set_index("block_label").rename(columns={"auc": "AUROC", "f1": "F1"})
-        stems = [fig_dir / "ablation/AblationFig_combined_heatmap"]
-        _tile_heatmap(matrix, stems, "Ablation summary heatmap", "Score", 0, 1, figsize=(6.8, max(5.0, 0.38 * len(matrix))))
-        written.append(stems[0].with_suffix(".png"))
-
-    # API paper-ready quality and reliability matrices.
-    q = _read(API_PAPER / "tables/T_api_stage1_quality_for_manuscript.csv")
-    if q is not None and not q.empty:
-        metrics = {
-            "schema_valid_rate": "Schema valid",
-            "section_completeness": "Section complete",
-            "mean_modality_support_rate": "Modality support",
-            "qc_pass_rate": "QC pass",
-            "unique_text_rate": "Unique text",
-        }
-        matrix = q.set_index("provider_label")[[c for c in metrics if c in q.columns]].rename(columns=metrics)
-        _tile_heatmap(matrix, [API_PAPER / "figures/P1_stage1_quality_heatmap"], "Structured pseudo-report generation quality", "Rate", 0, 1, figsize=(10.4, 5.8))
-        written.append(API_PAPER / "figures/P1_stage1_quality_heatmap.png")
-
-    rel = _read(API_PAPER / "tables/T_api_stage1_generation_reliability.csv")
-    if rel is not None and not rel.empty:
-        status = {"cached": "Cached", "ok": "Valid", "parse_warning": "Parse warning", "error": "Error"}
-        cols = [c for c in status if c in rel.columns]
-        if cols:
-            matrix = rel.set_index("provider_label")[cols].rename(columns=status)
-            _tile_heatmap(matrix, [API_PAPER / "figures/P4_stage1_generation_reliability"], "Generation reliability in the 100-case cohort", "Count", 0, max(1.0, float(matrix.max().max())), fmt=".0f", figsize=(8.8, 4.8))
-            written.append(API_PAPER / "figures/P4_stage1_generation_reliability.png")
-
-    provider_wide = _read(API_PAPER / "tables/T_api_llm_provider_comparison_structured_pseudo_report_generation.csv")
-    if provider_wide is not None and not provider_wide.empty and "Metric" in provider_wide.columns:
-        keep = ["Schema valid rate", "Section completeness", "Modality support", "Contradiction rate", "Hallucination rate", "Duplicate fraction", "Alignment MRR"]
-        matrix = provider_wide[provider_wide["Metric"].isin(keep)].set_index("Metric")
-        matrix = matrix.apply(pd.to_numeric, errors="coerce")
-        _tile_heatmap(matrix, [API_PAPER / "figures/P8_llm_provider_comparison_heatmap"], "LLM provider comparison for structured pseudo-report generation", "Metric value", 0, 1, figsize=(12.0, 5.6))
-        written.append(API_PAPER / "figures/P8_llm_provider_comparison_heatmap.png")
+        long = matrix.reset_index().melt(id_vars="block_label", var_name="metric", value_name="score")
+        _setup_theme()
+        fig, ax = plt.subplots(figsize=(7.2, max(4.8, 0.34 * len(matrix))))
+        sns.pointplot(data=long, y="block_label", x="score", hue="metric", orient="h", palette=[C0, C4], markers=["o", "s"], linestyles="-", ax=ax)
+        ax.set_xlim(0, 1.02)
+        ax.set_xlabel("Score")
+        ax.set_ylabel("")
+        ax.set_title("Ablation summary across modality, RASA, and QC blocks")
+        fig.tight_layout()
+        stem = fig_dir / "ablation/AblationFig_combined_heatmap"
+        stem.parent.mkdir(parents=True, exist_ok=True)
+        _save(fig, stem)
+        written.append(stem.with_suffix(".png"))
 
     return written
 
@@ -891,7 +814,11 @@ def _load_api38():
     if spec is None or spec.loader is None:
         return None
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    except ModuleNotFoundError as exc:
+        print(f"Skipping API stage restyle (missing dependency: {exc.name})")
+        return None
     return mod
 
 
@@ -940,17 +867,108 @@ def _sync_submission_figures() -> None:
             shutil.copy2(p, SUBMISSION / p.name)
 
 
+def _sync_project_figures() -> None:
+    """Copy canonical manuscript figures into JBD_2026/figures for LaTeX."""
+    project_fig = ROOT.parent / "figures"
+    project_fig.mkdir(parents=True, exist_ok=True)
+    sources = [
+        ROOT / "outputs/publishable/llm_api_provider_paper_ready/figures",
+        ROOT / "outputs/publishable/theme1_alignment/figures",
+        ROOT / "outputs/publishable/external_baselines/figures",
+        ROOT / "outputs/publishable/figures",
+        ROOT / "outputs/publishable/figures/jbd_final",
+        ROOT / "outputs/publishable/figures/main",
+    ]
+    names = [
+        "Figure1_mosaic_overview",
+        "Figure2_mosaic_architecture",
+        "Figure_mosaic_model_architecture",
+        "Figure2_centre_supervision_catplot",
+        "Figure_theme1_pseudo_report_source_comparison",
+        "Figure_theme1_alignment_retrieval_mrr",
+        "Figure_theme1_report_supervision_scarcity_curve",
+        "Figure_theme1_perturbation_sensitivity_matrix",
+        "Figure_mosaic_performance_summary",
+        "Figure_mosaic_primary_results_grouped",
+        "Figure_mosaic_auc_f1_marginal_scatter",
+        "Figure_mosaic_result_visualization_panels",
+        "Figure_external_baselines_grouped_bars",
+        "Figure_centre_auc_grouped_bars",
+        "Figure_mosaic_metrics_heatmap",
+        "Figure_main_AUC_pointplot",
+        "Figure_main_metrics_heatmap",
+        "Figure_main_auc_f1_scatter",
+        "Figure3_modality_perturbation_heatmap",
+        "Figure3_modality_perturbation_lineplot",
+        "Figure3_risk_delta_stripplot",
+        "fig_loco_heatmap",
+        "Figure4_loco_forest_catplot",
+        "Figure_external_baselines_auc_forest",
+        "Figure_external_baselines_metric_dotplot",
+        "Figure_external_baselines_paired_delta_auc",
+        "fig_rasa_lambda_lineplot",
+        "fig_modality_ablation_stripplot",
+        "fig_rasa_component_boxenplot",
+        "fig_lcad_qc_ablation_barplot",
+        "SupplementaryFigure_S1_masking_validation",
+        "SupplementaryFigure_S3_multiseed",
+        "P1_stage1_quality_heatmap",
+        "P2_stage1_quality_risk_bars",
+        "P3_stage1_latency_support_scatter",
+        "P4_stage1_generation_reliability",
+        "P5_stage2_macro_mrr",
+        "P6_stage2_section_mrr",
+        "P7_stage3_scarcity_auc",
+        "P8_llm_provider_comparison_heatmap",
+    ]
+    for name in names:
+        for src_dir in sources:
+            pdf = src_dir / f"{name}.pdf"
+            if pdf.is_file():
+                dst = project_fig / f"{name}.pdf"
+                if dst.exists() or dst.is_symlink():
+                    dst.unlink()
+                try:
+                    dst.symlink_to(pdf.resolve())
+                except OSError:
+                    shutil.copy2(pdf, dst)
+                png = src_dir / f"{name}.png"
+                if png.is_file():
+                    dst_png = project_fig / f"{name}.png"
+                    if dst_png.exists() or dst_png.is_symlink():
+                        dst_png.unlink()
+                    try:
+                        dst_png.symlink_to(png.resolve())
+                    except OSError:
+                        shutil.copy2(png, dst_png)
+                break
+
+    # Mirror API figures into publishable/figures for legacy manuscript paths.
+    api_src = ROOT / "outputs/publishable/llm_api_provider_paper_ready/figures"
+    pub_fig = ROOT / "outputs/publishable/figures"
+    if api_src.is_dir():
+        for p in api_src.glob("P*.*"):
+            if p.suffix.lower() in {".png", ".pdf"}:
+                shutil.copy2(p, pub_fig / p.name)
+
+
 def main() -> None:
     _setup_theme()
     generated = generate_all_seaborn_figures(ROOT)
     generate_all_ablation_figures(ROOT)
+    generate_result_visualization_figures(ROOT)
     _run_script(ROOT / "scripts/36_refresh_legacy_figure_styles.py")
     _run_script(ROOT / "scripts/39_generate_llm_api_paper_ready_outputs.py")
     _run_script(ROOT / "scripts/40_generate_llm_provider_comparison_table.py")
+    _run_script(ROOT / "scripts/50_generate_kra_semantic_fusion_figures.py")
+    _run_script(ROOT / "scripts/51_generate_mosaic_figure1_overview.py")
+    _run_script(ROOT / "scripts/52_generate_mosaic_architecture_figure.py")
     theme_written = _restyle_theme1()
     matrix_written = _restyle_matrix_outputs()
     api_written = _restyle_api_stage_dirs()
     _sync_submission_figures()
+    _sync_project_figures()
+    _run_script(ROOT / "scripts/56_redraw_individual_novel_figures.py")
     print("Restyled canonical figure groups:", len(generated))
     print("Restyled Theme1 figures:", len(theme_written))
     print("Restyled heatmap replacements:", len(matrix_written))

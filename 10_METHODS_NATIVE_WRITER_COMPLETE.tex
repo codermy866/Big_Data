@@ -1,0 +1,375 @@
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Study Design and Problem Formulation}
+\label{subsec:methods_design}
+
+We conducted a five-centre retrospective study of multimodal cervical screening under incomplete report-level supervision. Each case contained optical coherence tomography (OCT), colposcopy, and structured clinical information, whereas clinician-authored report supervision was available only for a subset of cases. This setting differs from conventional fully supervised report-generation or image-classification tasks: the visual and clinical evidence exists at scale, but semantic supervision in the form of structured reports is sparse and centre-dependent. The purpose of the proposed framework was therefore to use report semantics as an auditable alignment signal without assuming that real reports are available for every case.
+
+Let
+\begin{equation}
+\mathcal{D}=\{(x_i,y_i,r_i,c_i)\}_{i=1}^{N}
+\end{equation}
+denote the case-level cohort, where \(x_i\) is the multimodal evidence, \(y_i\in\{0,1\}\) is the binary CIN2+ endpoint, \(r_i\) denotes report-level supervision, and \(c_i\) is the centre identifier. In the final analytic cohort, \(N=1897\). Each case was represented as
+\begin{equation}
+x_i=\{x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin}\},
+\end{equation}
+where \(x_i^{oct}\), \(x_i^{col}\), \(x_i^{fus}\), and \(x_i^{clin}\) denote OCT evidence, colposcopy evidence, fused visual evidence, and structured clinical information, respectively. The binary endpoint was defined as
+\begin{equation}
+y_i=
+\begin{cases}
+1, & \text{if case }i\text{ met the predefined CIN2+ criterion},\\
+0, & \text{otherwise}.
+\end{cases}
+\end{equation}
+CIN3+ was used only as a safety-related endpoint where explicitly stated and was not substituted for the primary CIN2+ endpoint.
+
+The cohort was partitioned into development and locked held-out test sets using a fixed case-level split. All preprocessing decisions, model selection, hyperparameter selection, and operating-threshold selection were performed without access to the held-out test labels. Case-level splitting was used to avoid leakage from multiple images belonging to the same examination.
+
+\subsection{Multimodal Evidence Encoding}
+\label{subsec:methods_encoding}
+
+For each case, OCT and colposcopy image evidence was converted into cached visual embeddings. If a case contained multiple images for a modality, image-level representations were first extracted and then represented at the case level before downstream training. The publishable implementation used 2048-dimensional visual embeddings:
+\begin{equation}
+v_i^{oct},v_i^{col},v_i^{fus}\in\mathbb{R}^{2048}.
+\end{equation}
+Structured clinical information, including age, HPV, and TCT-related fields when available, was converted into a fixed-length clinical instruction vector
+\begin{equation}
+u_i\in\mathbb{R}^{32}.
+\end{equation}
+The four evidence streams were projected into a shared hidden space:
+\begin{align}
+h_i^{oct} &= W_{oct}v_i^{oct}+b_{oct},\\
+h_i^{col} &= W_{col}v_i^{col}+b_{col},\\
+h_i^{fus} &= W_{fus}v_i^{fus}+b_{fus},\\
+h_i^{clin} &= W_{clin}u_i+b_{clin}.
+\end{align}
+The fused case representation was obtained by a multilayer perceptron:
+\begin{equation}
+h_i = F_{\theta}\left([h_i^{oct};h_i^{col};h_i^{fus};h_i^{clin}]\right),
+\end{equation}
+where \([\cdot]\) denotes concatenation. This representation was shared by the structured report decoder, the section-alignment heads, and the CIN2+ risk head.
+
+\subsection{Report-Supervision Imbalance}
+\label{subsec:methods_report_imbalance}
+
+We explicitly modelled report availability at the case level. Let
+\begin{equation}
+\mathcal{R}=\{i:r_i^{real}\ \text{is available}\},
+\qquad
+\mathcal{P}=\{i:r_i^{real}\ \text{is unavailable and }x_i\ \text{is complete}\}
+\end{equation}
+denote the real-report and pseudo-report candidate sets. These sets were disjoint:
+\begin{equation}
+\mathcal{R}\cap\mathcal{P}=\emptyset .
+\end{equation}
+The training report for case \(i\) was defined as
+\begin{equation}
+\tilde{r}_i=
+\begin{cases}
+r_i^{real}, & i\in\mathcal{R},\\
+r_i^{pseudo}, & i\in\mathcal{P}.
+\end{cases}
+\end{equation}
+Real reports were used when available and were never overwritten. Pseudo reports were generated only for report-missing cases and were treated as weak semantic supervision rather than as physician-authored clinical documentation.
+
+\subsection{LCAD Structured Pseudo-Report Construction}
+\label{subsec:methods_lcad}
+
+For cases in \(\mathcal{P}\), we constructed structured pseudo reports using LCAD, a local label-constrained and evidence-aware pseudo-report generator. The generator received de-identified case-level evidence and produced a schema-constrained report:
+\begin{equation}
+r_i^{pseudo}=G_{\mathrm{LCAD}}\left(x_i^{oct},x_i^{col},x_i^{clin},y_i\right).
+\end{equation}
+Each report was represented as a set of clinically interpretable sections:
+\begin{equation}
+r_i^{pseudo}=\{s_i^{oct},s_i^{col},s_i^{clin},s_i^{imp},s_i^{rec}\},
+\end{equation}
+where \(s_i^{oct}\), \(s_i^{col}\), \(s_i^{clin}\), \(s_i^{imp}\), and \(s_i^{rec}\) correspond to OCT findings, colposcopy findings, clinical context, diagnostic impression, and recommendation, respectively. The schema was used to prevent unstructured free-form text from becoming an uncontrolled supervision source.
+
+Pseudo reports were assigned quality-control scores before training. Let \(q_i\in[0,1]\) denote the QC score and \(p_i\in[0,1]\) denote the generation confidence. The effective pseudo-report weight was
+\begin{equation}
+w_i^{pseudo}=
+\begin{cases}
+p_iq_i, & \text{if the pseudo report passed QC},\\
+0, & \text{otherwise}.
+\end{cases}
+\end{equation}
+The final report-supervision weight was
+\begin{equation}
+w_i=
+\begin{cases}
+1, & i\in\mathcal{R},\\
+w_i^{pseudo}, & i\in\mathcal{P}.
+\end{cases}
+\end{equation}
+QC checks included schema validity, section completeness, label--impression consistency, modality support, contradiction risk, hallucination risk, confidence validity, and privacy sanitisation. Cases failing severe checks were excluded from report-loss supervision by assigning zero effective report weight.
+
+\subsection{External LLM Provider Comparison for Structured Report Generation}
+\label{subsec:methods_api_provider}
+
+The primary LCAD--RASA model used local structured pseudo reports. Separately, we evaluated whether structured pseudo-report generation could be treated as a replaceable LLM-augmented component. Under a common schema, external provider outputs were compared with template, rule-based, and local pseudo-report sources. The provider comparison was designed to measure generation reliability rather than to replace the main training pipeline.
+
+For an external provider \(m\), the generated report was written as
+\begin{equation}
+r_{i,m}^{api}=G_m(e_i;\mathcal{S}),
+\end{equation}
+where \(e_i\) denotes de-identified structured evidence and \(\mathcal{S}\) denotes the required pseudo-report schema. Raw images, image paths, names, internal patient identifiers, hospital identifiers, and directly identifying information were not transmitted. Provider outputs were evaluated for schema validity, section completeness, modality support, contradiction rate, hallucination rate, duplicate fraction, latency, and estimated cost. These experiments support substitutability and scalability claims for structured pseudo-report generation, but they were not used to claim that API-generated reports independently reproduce the final LCAD--RASA training effect unless a downstream experiment explicitly evaluated that setting.
+
+\subsection{RASA Architecture}
+\label{subsec:methods_rasa}
+
+RASA, Report-Anchored Structured Alignment, couples multimodal risk prediction with structured report decoding. Given the fused representation \(h_i\), the model predicts both a report-token sequence and a CIN2+ risk score. Let \(t_i=(t_{i,1},\ldots,t_{i,L})\) denote the tokenised training report \(\tilde{r}_i\). Token embeddings were conditioned on the fused case representation:
+\begin{equation}
+\bar{e}_{i,l}=E(t_{i,l})+h_i,
+\end{equation}
+where \(E(\cdot)\) is the token-embedding function. Contextual hidden states were then computed by a transformer encoder:
+\begin{equation}
+H_i=\mathrm{Transformer}_{\phi}(\bar{e}_{i,1},\ldots,\bar{e}_{i,L}),
+\end{equation}
+and token logits were obtained as
+\begin{equation}
+\hat{T}_{i,l}=W_{dec}H_{i,l}+b_{dec}.
+\end{equation}
+The CIN2+ risk score was predicted from the fused representation:
+\begin{equation}
+\hat{p}_i=\sigma(W_{risk}h_i+b_{risk}),
+\end{equation}
+where \(\sigma(\cdot)\) is the sigmoid function.
+
+\subsection{Section-Level Semantic Alignment}
+\label{subsec:methods_section_alignment}
+
+The central innovation of RASA is to use structured report sections as explicit semantic anchors for multimodal representation learning. The decoder hidden sequence was divided into section-level proxies according to the report schema:
+\begin{equation}
+g_i^k=\mathrm{Pool}_{k}(H_i),\qquad k\in\mathcal{K},
+\end{equation}
+where
+\begin{equation}
+\mathcal{K}=\{oct,col,clin,imp\}.
+\end{equation}
+The four proxies correspond to OCT findings, colposcopy findings, clinical context, and diagnostic impression. The fused representation was mapped into section-specific alignment spaces:
+\begin{equation}
+a_i^{k}=A_k(h_i),\qquad k\in\mathcal{K}.
+\end{equation}
+The section-alignment loss was defined as the average cosine distance between each section projection and its corresponding report-section proxy:
+\begin{equation}
+\mathcal{L}_{align}
+=
+\frac{1}{B|\mathcal{K}|}
+\sum_{i=1}^{B}
+\sum_{k\in\mathcal{K}}
+\left[
+1-
+\frac{a_i^{k}\cdot g_i^{k}}{\|a_i^{k}\|_2\|g_i^{k}\|_2}
+\right].
+\end{equation}
+This formulation encourages OCT evidence to align with OCT findings, colposcopy evidence with colposcopy findings, structured clinical evidence with clinical context, and fused evidence with diagnostic impression. It therefore turns structured reports from passive text targets into modality-aware semantic supervision.
+
+\subsection{Training Objective}
+\label{subsec:methods_objective}
+
+The model was trained using a weighted multi-task objective. The report-generation loss was
+\begin{equation}
+\mathcal{L}_{rep}
+=
+-\frac{1}{B}\sum_{i=1}^{B}
+w_i
+\frac{1}{L}
+\sum_{l=1}^{L}
+\log P_{\theta}(t_{i,l}\mid t_{i,<l},x_i).
+\end{equation}
+The CIN2+ risk-prediction loss was
+\begin{equation}
+\mathcal{L}_{risk}
+=
+-\frac{1}{B}
+\sum_{i=1}^{B}
+\left[
+y_i\log\hat{p}_i+(1-y_i)\log(1-\hat{p}_i)
+\right].
+\end{equation}
+Label-consistency regularisation penalised disagreement between the risk score and the training endpoint:
+\begin{equation}
+\mathcal{L}_{cons}
+=
+\frac{1}{B}\sum_{i=1}^{B}|\hat{p}_i-y_i|.
+\end{equation}
+The total objective was
+\begin{equation}
+\mathcal{L}
+=
+\lambda_{rep}\mathcal{L}_{rep}
++
+\lambda_{align}\mathcal{L}_{align}
++
+\lambda_{risk}\mathcal{L}_{risk}
++
+\lambda_{cons}\mathcal{L}_{cons}.
+\end{equation}
+In the locked publishable configuration, the default weights were \(\lambda_{rep}=1.0\), \(\lambda_{align}=0.5\), \(\lambda_{risk}=0.2\), and \(\lambda_{cons}=0.1\), unless otherwise stated in ablation experiments. Component ablations were implemented by removing the corresponding module or setting the relevant coefficient to zero.
+
+\subsection{Contrastive-Teacher Distillation Audit}
+\label{subsec:methods_distillation}
+
+Because the same-split external baseline audit identified a strong contrastive multimodal comparator, we additionally performed a gated distillation audit. This analysis was not assumed to be part of the final LCAD--RASA method. Instead, it tested whether a contrastive teacher could improve the report-aware student without degrading the locked operating behaviour.
+
+Let \(\hat{p}_i^{T}\) denote the teacher score and \(\hat{p}_i^{S}\) the student score. The distillation loss was
+\begin{equation}
+\mathcal{L}_{distill}
+=
+-\frac{1}{B}
+\sum_{i=1}^{B}
+\left[
+\hat{p}_i^{T}\log\hat{p}_i^{S}
++(1-\hat{p}_i^{T})\log(1-\hat{p}_i^{S})
+\right].
+\end{equation}
+The audited student objective was
+\begin{equation}
+\mathcal{L}_{student}
+=
+\mathcal{L}
++
+\lambda_{distill}\mathcal{L}_{distill}.
+\end{equation}
+Distillation was promoted to the manuscript method only if the distilled student improved both AUROC and F1 over the locked Full LCAD--RASA reference under the same split and validation-threshold protocol:
+\begin{equation}
+\Delta_{\mathrm{promote}}
+=
+\mathbb{I}\left[
+AUROC_{distill}>AUROC_{full}
+\ \land\
+F1_{distill}>F1_{full}
+\right].
+\end{equation}
+This gate prevents a higher-AUROC but lower-F1 or otherwise unstable distilled variant from being presented as part of the final framework.
+
+\subsection{External Same-Split Baselines}
+\label{subsec:methods_baselines}
+
+To avoid comparing LCAD--RASA only with weak internal variants, we implemented an external baseline block under the identical train/validation/test split, validation-selected threshold rule, locked held-out test set, and bootstrap protocol. The baseline set included clinical-only logistic regression, clinical-only gradient boosting, OCT-only embedding MLP, colposcopy-only embedding MLP, late-fusion MLP, cross-attention multimodal transformer, and a CLIP-style contrastive multimodal baseline without report-section supervision.
+
+For late fusion, modality representations were concatenated:
+\begin{equation}
+z_i^{late}=[v_i^{oct};v_i^{col};v_i^{clin}],
+\end{equation}
+and classified by an MLP. The cross-attention transformer treated modalities as tokens:
+\begin{equation}
+Z_i=[z_i^{oct},z_i^{col},z_i^{clin}],
+\qquad
+\tilde{Z}_i=\mathrm{Transformer}(Z_i),
+\end{equation}
+with the pooled representation used for risk prediction. The contrastive baseline used a discriminative classification loss plus a cross-modal contrastive term. For two modality projections \(z_i^{a}\) and \(z_i^{b}\), the contrastive loss was
+\begin{equation}
+\mathcal{L}_{con}^{a,b}
+=
+-\frac{1}{B}\sum_{i=1}^{B}
+\log
+\frac{\exp(\mathrm{sim}(z_i^{a},z_i^{b})/\tau)}
+{\sum_{j=1}^{B}\exp(\mathrm{sim}(z_i^{a},z_j^{b})/\tau)},
+\end{equation}
+where \(\tau\) is the temperature and \(\mathrm{sim}(\cdot,\cdot)\) denotes cosine similarity. These baselines were used to define the comparative claim boundary: LCAD--RASA is a report-aware semantic alignment framework, not a claim of universal AUROC superiority over all discriminative multimodal models.
+
+\subsection{Report-Scarcity and Modality-Section Retrieval Analyses}
+\label{subsec:methods_scarcity_retrieval}
+
+To evaluate whether pseudo-report supervision was most useful when real reports were scarce, the fraction of available real reports was varied:
+\begin{equation}
+\rho\in\{0.10,0.25,0.50,1.00\}.
+\end{equation}
+For a given \(\rho\), the real-report-only setting used
+\begin{equation}
+\mathcal{R}_{\rho}\subseteq\mathcal{R},
+\qquad
+|\mathcal{R}_{\rho}|=\rho|\mathcal{R}|,
+\end{equation}
+whereas the LCAD-augmented setting used
+\begin{equation}
+\mathcal{S}_{\rho}=\mathcal{R}_{\rho}\cup\mathcal{P}_{QC},
+\end{equation}
+with \(\mathcal{P}_{QC}\) denoting QC-passed pseudo-report cases.
+
+Modality-section alignment was evaluated as a retrieval problem. The similarity between a projected modality representation and a report-section proxy was
+\begin{equation}
+s(a_i^k,g_j^k)
+=
+\frac{a_i^k\cdot g_j^k}{\|a_i^k\|_2\|g_j^k\|_2}.
+\end{equation}
+For each query case \(i\), the rank of the matched section was used to compute mean reciprocal rank:
+\begin{equation}
+MRR=
+\frac{1}{N}
+\sum_{i=1}^{N}
+\frac{1}{rank_i},
+\end{equation}
+and Recall@\(K\):
+\begin{equation}
+Recall@K=
+\frac{1}{N}
+\sum_{i=1}^{N}
+\mathbb{I}(rank_i\leq K).
+\end{equation}
+
+\subsection{Perturbation and Cross-Centre Evaluation}
+\label{subsec:methods_perturbation_loco}
+
+Perturbation experiments were used to test whether generated report sections were sensitive to their corresponding modality evidence. Let \(M_k(\cdot)\) denote a modality perturbation operator, such as masking OCT, masking colposcopy, masking clinical instruction, shuffling evidence, or using label-only inference. The perturbed input was
+\begin{equation}
+x_i^{(k)}=M_k(x_i).
+\end{equation}
+Risk displacement was defined as
+\begin{equation}
+\Delta p_i^{k}=|\hat{p}_i(x_i)-\hat{p}_i(x_i^{(k)})|.
+\end{equation}
+Section-level degradation was computed analogously by comparing the report section generated from \(x_i\) with the corresponding section generated from \(x_i^{(k)}\). These analyses were interpreted as perturbational fidelity checks and not as causal clinical explanations.
+
+For leave-one-centre-out evaluation, each centre \(c\) defined
+\begin{equation}
+\mathcal{D}_{train}^{(-c)}=\{i:c_i\neq c\},
+\qquad
+\mathcal{D}_{test}^{(c)}=\{i:c_i=c\}.
+\end{equation}
+Strict LOCO retraining and eval-only LOCO using a global checkpoint were reported separately because they address different questions: retraining under centre exclusion versus evaluating a fixed global model under centre shift.
+
+\subsection{Statistical Analysis}
+\label{subsec:methods_statistics}
+
+Discrimination was measured using AUROC. Threshold-dependent performance was measured using F1, sensitivity, specificity, precision, and balanced accuracy at the validation-selected threshold. The operating threshold was selected only on the validation set:
+\begin{equation}
+\tau^{*}
+=
+\arg\max_{\tau\in\mathcal{T}}
+F1\left(\mathbb{I}(\hat{p}_i\geq\tau),y_i\right),
+\qquad i\in\mathcal{D}_{val}.
+\end{equation}
+Held-out predictions were then computed as
+\begin{equation}
+\hat{y}_i=\mathbb{I}(\hat{p}_i\geq\tau^{*}),
+\qquad i\in\mathcal{D}_{test}.
+\end{equation}
+
+Uncertainty was estimated by case-level bootstrap resampling. For a metric \(m\), the 95\% confidence interval was
+\begin{equation}
+CI_{95\%}
+=
+\left[
+Q_{0.025}\left(\{m^{(b)}\}_{b=1}^{B}\right),
+Q_{0.975}\left(\{m^{(b)}\}_{b=1}^{B}\right)
+\right],
+\end{equation}
+where \(m^{(b)}\) is the metric value in bootstrap sample \(b\). Paired AUROC differences were computed as
+\begin{equation}
+\Delta^{(b)}
+=
+AUROC_{Full}^{(b)}
+-
+AUROC_{Comp}^{(b)}.
+\end{equation}
+Positive values favoured Full LCAD--RASA, whereas negative values favoured the comparator. Statistical testing was used to quantify uncertainty and paired differences; it was not used to support unrestricted clinical superiority claims.
+
+\subsection{Implementation, Privacy, and Reproducibility}
+\label{subsec:methods_implementation}
+
+All analyses were implemented in Python using PyTorch and standard scientific-computing packages. Visual embeddings, structured report schemas, pseudo-report QC outputs, prediction files, figure indices, and manuscript tables were exported as reproducibility artefacts under the publishable output directory. External API experiments used only de-identified structured evidence. Raw images, raw file paths, patient names, internal patient identifiers, hospital identifiers, phone numbers, identity numbers, and exact clinical record identifiers were not transmitted.
+
+The study is retrospective and does not claim prospective clinical deployment or autonomous decision support. Generated reports were used as weak semantic supervision and audit artefacts; they were not treated as clinical records. Expert physician ratings were not available for the present manuscript version and are therefore not claimed as completed validation. Ethics approval, consent waiver or consent procedure, and institutional review board identifiers should be inserted by the authors according to local requirements.

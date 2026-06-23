@@ -29,19 +29,19 @@ PROVIDER_ORDER = [
     ("aihubmix_gpt", "GPT-5.5"),
 ]
 MORANDI_HEX = [
-    "#2f5f8f",
-    "#8fb8d8",
-    "#d9a066",
-    "#efd7b5",
-    "#9e3f3a",
-    "#d47f6f",
-    "#7f7f7f",
-    "#d6d6d6",
+    "#3E3425",
+    "#998560",
+    "#ADB093",
+    "#E1CA9E",
+    "#1E3A66",
+    "#4F8FD6",
+    "#C5B5E8",
+    "#E76B6B",
 ]
 MORANDI = sns.color_palette(MORANDI_HEX)
 MORANDI_DIV = LinearSegmentedColormap.from_list(
     "cell_div_blue_red",
-    ["#1f3f64", "#8fb8d8", "#e4eef0", "#f7f7f2", "#d9a066", "#d47f6f", "#9e3f3a"],
+    ["#E76B6B", "#F2D6A6", "#F7F8FB", "#8FA6E3", "#1E3A66"],
     N=256,
 )
 
@@ -99,7 +99,7 @@ def _setup_style() -> None:
             "xtick.labelsize": 12,
             "ytick.labelsize": 12,
             "legend.fontsize": 12,
-            "patch.edgecolor": "#3a3a3a",
+            "patch.edgecolor": "#3E3425",
             "font.family": "Arial",
             "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans"],
         }
@@ -186,38 +186,30 @@ def main() -> None:
         "macro_mrr": "Alignment MRR",
     }
     heat = heat.rename(columns=rename)
-
-    fig, ax = plt.subplots(figsize=(12.6, 6.2))
-    sns.heatmap(
-        heat,
-        annot=True,
-        fmt=".2f",
-        cmap=MORANDI_DIV,
-        center=0.5,
-        linewidths=0.5,
-        linecolor="white",
-        cbar_kws={"label": "Metric value"},
-        annot_kws={"size": 12, "weight": "bold"},
-        ax=ax,
+    long = heat.reset_index().melt(id_vars="Provider", var_name="Metric", value_name="Value")
+    g = sns.FacetGrid(long, col="Metric", col_wrap=4, height=2.35, aspect=1.15, sharex=False)
+    g.map_dataframe(
+        sns.barplot,
+        y="Provider",
+        x="Value",
+        orient="h",
+        palette=MORANDI_HEX[: len(heat)],
+        edgecolor="0.25",
+        linewidth=0.7,
+        alpha=0.9,
     )
-    ax.set_title("Structured pseudo-report generation: model comparison")
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.title.set_fontweight("bold")
-    ax.title.set_fontsize(18)
-    for label in ax.get_xticklabels():
-        label.set_fontsize(12)
-        label.set_fontweight("bold")
-        label.set_rotation(25)
-        label.set_ha("right")
-    for label in ax.get_yticklabels():
-        label.set_fontsize(12)
+    g.set_axis_labels("Metric value", "")
+    g.set_titles("{col_name}")
+    for ax in g.axes.flat:
+        ax.set_xlim(0, 1.05)
+        ax.grid(True, axis="x", alpha=0.35)
+    g.fig.suptitle("Structured pseudo-report generation: model comparison", y=1.03, fontweight="bold", fontsize=16)
     FIGS.mkdir(parents=True, exist_ok=True)
-    sns.despine(fig=fig)
-    fig.tight_layout()
-    fig.savefig(FIGS / "P8_llm_provider_comparison_heatmap.png", dpi=300, bbox_inches="tight")
-    fig.savefig(FIGS / "P8_llm_provider_comparison_heatmap.pdf", bbox_inches="tight")
-    plt.close(fig)
+    sns.despine(fig=g.fig)
+    g.fig.tight_layout()
+    g.fig.savefig(FIGS / "P8_llm_provider_comparison_heatmap.png", dpi=300, bbox_inches="tight")
+    g.fig.savefig(FIGS / "P8_llm_provider_comparison_heatmap.pdf", bbox_inches="tight")
+    plt.close(g.fig)
 
     print(TABLES / out_name)
 

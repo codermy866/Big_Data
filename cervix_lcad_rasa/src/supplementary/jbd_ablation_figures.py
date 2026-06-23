@@ -33,10 +33,13 @@ OUT_REL = "outputs/publishable/figures/ablation"
 
 
 def _save(fig: plt.Figure, path: Path) -> None:
+    from src.supplementary.jbd_figure_typography import apply_arial_to_figure
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white")
+    apply_arial_to_figure(fig)
+    fig.savefig(path.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white", pad_inches=0.08)
     try:
-        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white")
+        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", facecolor="white", pad_inches=0.08)
     except Exception:
         pass
     plt.close(fig)

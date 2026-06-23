@@ -15,7 +15,29 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+import sys
+
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from src.supplementary.jbd_figures_seaborn import (
+    C0,
+    C1,
+    C2,
+    C4,
+    C6,
+    EDGE_DARK,
+    FIG_FACE,
+    JBD_PALETTE_HEX,
+    NATURE_HEATMAP_DIV,
+    NATURE_HEATMAP_SEQ,
+    TEXT_DARK,
+    _cmap_diverging,
+    _cmap_sequential,
+)
+from src.supplementary.jbd_figure_typography import apply_arial_to_figure, setup_arial_rcparams
+from src.supplementary.jbd_novel_figure_styles import proportion_heatmap, scarcity_heatmap
+
 PILOT = ROOT / "outputs/publishable/llm_api_provider_comparison_aihubmix_pilot10"
 FREE_EXT = ROOT / "outputs/publishable/llm_api_provider_comparison_aihubmix_stage123_100"
 PAID_GPT_EXT = ROOT / "outputs/publishable/llm_api_provider_comparison_aihubmix_gpt_paid_100"
@@ -35,35 +57,10 @@ PROVIDER_LABELS = {
     "aihubmix_glm": "GLM-4.7-Flash",
     "aihubmix_gemini": "Gemini-3.1-Pro",
 }
-MORANDI_HEX = [
-    "#2f5f8f",
-    "#8fb8d8",
-    "#d9a066",
-    "#efd7b5",
-    "#9e3f3a",
-    "#d47f6f",
-    "#7f7f7f",
-    "#d6d6d6",
-]
+MORANDI_HEX = JBD_PALETTE_HEX
 MORANDI = sns.color_palette(MORANDI_HEX)
-MORANDI_SEQ = LinearSegmentedColormap.from_list(
-    "cell_seq_blue",
-    [
-        "#f7f7f2",
-        "#e4eef0",
-        "#c3dae6",
-        "#8fb8d8",
-        "#5d88b3",
-        "#2f5f8f",
-        "#1f3f64",
-    ],
-    N=256,
-)
-MORANDI_DIV = LinearSegmentedColormap.from_list(
-    "cell_div_blue_red",
-    ["#1f3f64", "#8fb8d8", "#e4eef0", "#f7f7f2", "#d9a066", "#d47f6f", "#9e3f3a"],
-    N=256,
-)
+MORANDI_SEQ = _cmap_sequential()
+MORANDI_DIV = _cmap_diverging()
 
 
 def _read(path: Path) -> pd.DataFrame:
@@ -303,24 +300,24 @@ def _save(fig: plt.Figure, name: str) -> None:
 
 def _polish_axes(ax: plt.Axes, *, rotate_x: int = 0, legend: bool = False) -> None:
     ax.title.set_fontweight("bold")
-    ax.title.set_fontsize(18)
+    ax.title.set_fontsize(10)
     ax.xaxis.label.set_fontweight("bold")
-    ax.xaxis.label.set_fontsize(15)
+    ax.xaxis.label.set_fontsize(9)
     ax.yaxis.label.set_fontweight("bold")
-    ax.yaxis.label.set_fontsize(15)
+    ax.yaxis.label.set_fontsize(9)
     for label in ax.get_xticklabels():
-        label.set_fontsize(12)
+        label.set_fontsize(8)
         label.set_rotation(rotate_x)
         if rotate_x:
             label.set_ha("right")
     for label in ax.get_yticklabels():
-        label.set_fontsize(12)
+        label.set_fontsize(8)
     if legend and ax.get_legend() is not None:
         for text in ax.get_legend().get_texts():
-            text.set_fontsize(12)
+            text.set_fontsize(8)
         title = ax.get_legend().get_title()
         if title is not None:
-            title.set_fontsize(13)
+            title.set_fontsize(8)
             title.set_fontweight("bold")
 
 
@@ -335,31 +332,32 @@ def _plot_quality(quality: pd.DataFrame) -> None:
     ]
     heat = plot.set_index("provider_label")[metrics].astype(float).rename(
         columns={
-            "schema_valid_rate": "Schema\nvalidity",
-            "section_completeness": "Section\ncompleteness",
-            "mean_modality_support_rate": "Modality\nsupport",
+            "schema_valid_rate": "Schema validity",
+            "section_completeness": "Section completeness",
+            "mean_modality_support_rate": "Modality support",
             "qc_pass_rate": "QC pass",
-            "unique_text_rate": "Unique\ntext",
+            "unique_text_rate": "Unique text",
         }
     )
-    fig, ax = plt.subplots(figsize=(11.8, 6.2))
+    setup_arial_rcparams()
+    fig, ax = plt.subplots(figsize=(10.8, 5.6))
     sns.heatmap(
         heat,
         annot=True,
         fmt=".2f",
         cmap=MORANDI_SEQ,
+        linewidths=0.8,
+        linecolor="white",
+        cbar_kws={"label": "Rate", "shrink": 0.78},
+        ax=ax,
         vmin=0,
         vmax=1,
-        linewidths=0.5,
-        linecolor="white",
-        cbar_kws={"label": "Rate"},
-        annot_kws={"size": 12, "weight": "bold"},
-        ax=ax,
     )
+    ax.set_title("Structured pseudo-report generation quality")
     ax.set_xlabel("")
     ax.set_ylabel("")
-    ax.set_title("Structured pseudo-report generation quality")
-    _polish_axes(ax, rotate_x=0)
+    _polish_axes(ax)
+    apply_arial_to_figure(fig)
     _save(fig, "P1_stage1_quality_heatmap")
 
     long = plot.melt(
@@ -374,39 +372,39 @@ def _plot_quality(quality: pd.DataFrame) -> None:
             "max_duplicate_fraction": "Duplicate fraction",
         }
     )
-    fig, ax = plt.subplots(figsize=(12.2, 6.2))
-    sns.barplot(
+    fig, ax = plt.subplots(figsize=(10.8, 5.4))
+    sns.boxenplot(
         data=long,
-        x="provider_label",
-        y="rate",
+        y="provider_label",
+        x="rate",
         hue="risk_metric",
         palette=[MORANDI_HEX[4], MORANDI_HEX[2]],
-        edgecolor="0.25",
-        linewidth=0.9,
-        alpha=0.86,
+        linewidth=0.8,
+        orient="h",
         ax=ax,
     )
     sns.stripplot(
         data=long,
-        x="provider_label",
-        y="rate",
+        y="provider_label",
+        x="rate",
         hue="risk_metric",
         dodge=True,
         marker="s",
         size=7,
-        edgecolor="0.25",
+        edgecolor=EDGE_DARK,
         linewidth=0.8,
         palette=[MORANDI_HEX[4], MORANDI_HEX[2]],
+        orient="h",
         ax=ax,
         legend=False,
     )
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Rate")
-    ax.set_xlabel("")
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Rate")
+    ax.set_ylabel("")
     ax.set_title("Clinical consistency and repetition risk")
-    ax.tick_params(axis="x", rotation=25)
-    ax.legend(frameon=False, title="Metric")
+    ax.legend(frameon=False, title="Metric", loc="lower right")
     _polish_axes(ax, legend=True)
+    apply_arial_to_figure(fig)
     _save(fig, "P2_stage1_quality_risk_bars")
 
     api = plot[plot["provider"].isin(API_PROVIDERS)].dropna(subset=["mean_latency_seconds"])
@@ -514,22 +512,14 @@ def _plot_reliability(reliability: pd.DataFrame) -> None:
         "error": "Error",
     }
     matrix = plot.set_index("provider_label")[status_cols].rename(columns=status_labels).astype(float)
-    fig, ax = plt.subplots(figsize=(9.4, 5.2))
-    sns.heatmap(
-        matrix,
-        annot=True,
-        fmt=".0f",
-        cmap=MORANDI_SEQ,
-        linewidths=0.6,
-        linecolor="white",
-        cbar_kws={"label": "Count"},
-        annot_kws={"size": 12, "weight": "bold"},
-        ax=ax,
+    props = matrix.div(matrix.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
+    fig = proportion_heatmap(
+        props,
+        title="Generation reliability in the 100-case cohort",
+        cbar_label="Outcome fraction",
+        figsize=(9.4, 4.8),
     )
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.set_title("Generation reliability in the 100-case cohort")
-    _polish_axes(ax, rotate_x=0)
+    apply_arial_to_figure(fig)
     _save(fig, "P4_stage1_generation_reliability")
 
 
@@ -594,7 +584,7 @@ def _plot_alignment(macro: pd.DataFrame, section: pd.DataFrame) -> None:
         )
         g.set_axis_labels("MRR", "")
         g.set_titles("{col_name}")
-        g.fig.suptitle("Section-specific semantic alignment", y=1.03, fontweight="bold", fontsize=18)
+        g.fig.suptitle("Section-specific semantic alignment", y=1.03, fontweight="bold", fontsize=10)
         for ax in g.axes.flat:
             ax.set_xlim(0, max(0.45, float(sec["mrr"].max()) * 1.12))
             ax.grid(True, axis="x", alpha=0.35)
@@ -605,35 +595,22 @@ def _plot_alignment(macro: pd.DataFrame, section: pd.DataFrame) -> None:
 def _plot_scarcity(scarcity: pd.DataFrame) -> None:
     if scarcity.empty or "auc_mean" not in scarcity.columns:
         return
-    fig, ax = plt.subplots(figsize=(11.0, 5.8))
-    plot = scarcity.sort_values(["real_report_fraction", "provider_label"]).copy()
-    palette = {p: MORANDI_HEX[i % len(MORANDI_HEX)] for i, p in enumerate(plot["provider_label"].drop_duplicates())}
-    x_levels = sorted(plot["real_report_fraction"].unique())
-    offsets = np.linspace(-0.035, 0.035, max(1, plot["provider_label"].nunique()))
-    off_map = {p: offsets[i] for i, p in enumerate(plot["provider_label"].drop_duplicates())}
-    for provider, g in plot.groupby("provider_label"):
-        xs = g["real_report_fraction"].astype(float) + off_map[provider]
-        ax.plot(xs, g["auc_mean"], color=palette[provider], linewidth=1.5, alpha=0.86)
-        ax.scatter(xs, g["auc_mean"], s=86, marker="o", color=palette[provider], edgecolor="0.25", linewidth=0.8, label=provider, zorder=3)
-    for _, row in plot.iterrows():
-        if pd.notna(row.get("auc_std", np.nan)):
-            xval = float(row["real_report_fraction"]) + off_map[row["provider_label"]]
-            ax.errorbar(
-                xval,
-                row["auc_mean"],
-                yerr=row["auc_std"],
-                fmt="none",
-                ecolor="0.25",
-                elinewidth=1.0,
-                capsize=3,
-            )
-    ax.set_xticks([0.1, 0.25, 0.5, 1.0])
-    ax.set_xticklabels(["10%", "25%", "50%", "100%"])
-    ax.set_xlabel("Available real-report supervision")
-    ax.set_ylabel("AUROC")
-    ax.set_title("Downstream performance under report-supervision scarcity")
-    ax.legend(frameon=False, title="Model")
-    _polish_axes(ax, legend=True)
+    plot = scarcity.copy()
+    plot["provider_label"] = plot["provider_label"].astype(str)
+    fig = scarcity_heatmap(
+        plot,
+        x="real_report_fraction",
+        y="auc_mean",
+        hue="provider_label",
+        hue_order=sorted(plot["provider_label"].unique()),
+        title="Downstream performance under report-supervision scarcity",
+        xlabel="Available real-report supervision fraction",
+        ylabel="Provider / model",
+        cbar_label="AUROC",
+        err_col="auc_std" if "auc_std" in plot.columns else None,
+        figsize=(9.0, max(4.2, 0.42 * plot["provider_label"].nunique())),
+    )
+    apply_arial_to_figure(fig)
     _save(fig, "P7_stage3_scarcity_auc")
 
 

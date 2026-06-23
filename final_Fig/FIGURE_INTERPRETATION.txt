@@ -1,0 +1,144 @@
+JBD_2026 manuscript figure interpretation index
+Source: sn-article (7).tex | folder: final_Fig/
+
+=== Cohort & weak-oracle setup ===
+
+Figure2_centre_supervision_catplot
+  Experiment: Five-centre retrospective cohort (n=1,897).
+  Validates: Imaging scale is large but real-report supervision is centre-imbalanced;
+  pseudo-report candidates fill report-missing cases. Bubble size = image volume.
+
+Figure_theme1_pseudo_report_source_comparison
+  Experiment: Compare label-template vs rule-based vs local-LLM pseudo reports (n=180 each).
+  Validates: Schema-complete templates are not enough; rule/LLM sources retain modality
+  support and higher textual diversity than label templates.
+
+=== LLM API provider audit (supplementary) ===
+
+P8_llm_provider_comparison_heatmap
+  Experiment: Multi-metric comparison across template, rule, local LLM, and API providers.
+  Validates: Structured pseudo-report generation is configurable across providers.
+
+P1_stage1_quality_heatmap
+  Experiment: Stage-1 quality metrics (completeness, modality support, etc.).
+  Validates: Providers differ in generation validity and section quality.
+
+P2_stage1_quality_risk_bars
+  Experiment: Risk-oriented QC metrics (contradiction, duplication).
+  Validates: Clinical-consistency and repetition risks vary by provider.
+
+P3_stage1_latency_support_scatter
+  Experiment: API latency vs modality-support rate; bubble = token usage.
+  Validates: Operational trade-off between speed and modality grounding.
+
+P4_stage1_generation_reliability
+  Experiment: Request outcome fractions (valid / warning / error).
+  Validates: API cohort achieves high schema-valid completion rates.
+
+P5_stage2_macro_mrr / P6_stage2_section_mrr
+  Experiment: Modality-section retrieval after provider-generated reports.
+  Validates: Whether API pseudo reports support cross-modal section alignment.
+
+P7_stage3_scarcity_auc
+  Experiment: Downstream surrogate under reduced real-report supervision.
+  Validates: Feasibility of API-generated reports in low-report regimes.
+
+=== Semantic alignment ===
+
+Figure_theme1_alignment_retrieval_mrr
+  Experiment: RASA alignment ablation via modality-section retrieval MRR.
+  Validates: Section-aware alignment improves relative retrieval organisation;
+  real reports remain strongest anchors when available.
+
+Figure_theme1_report_supervision_scarcity_curve
+  Experiment: Downstream surrogate with 10–100% real-report fractions.
+  Validates: Pseudo-report augmentation helps most when real reports are scarce.
+
+=== Main MOSAIC results ===
+
+Figure_mosaic_performance_summary
+  Experiment: Locked held-out test (n=288); backbone vs retrieval vs MOSAIC fusion.
+  Validates: Train-only semantic retrieval + validation-calibrated fusion improves
+  discrimination, score separation, and centre-wise gains over backbone alone.
+
+Figure_mosaic_metrics_heatmap
+  Experiment: Compact multi-metric profile for MOSAIC variants.
+  Validates: Gains are consistent across AUROC, AUPRC, F1, and related metrics.
+
+=== Protocol harmonisation (supplementary) ===
+
+Figure_main_AUC_pointplot
+  Experiment: Historical backbone variants on locked test set with bootstrap CI.
+  Validates: Report-aware and pseudo-augmented variants vs baselines before MOSAIC fusion.
+
+Figure_main_metrics_heatmap
+  Experiment: Multi-metric heatmap across backbone ablations.
+  Validates: Relative profile of discrimination and threshold-dependent metrics.
+
+Figure_main_auc_f1_scatter
+  Experiment: AUROC–F1 joint distribution across variants.
+  Validates: Operating-point trade-off between ranking and thresholded performance.
+
+=== External baselines ===
+
+Figure_external_baselines_auc_forest
+  Experiment: Same-split comparison vs clinical/image/fusion/contrastive baselines.
+  Validates: MOSAIC is competitive with strong external baselines under identical protocol.
+
+Figure_external_baselines_metric_dotplot
+  Experiment: Multi-metric dot profile for all comparators.
+  Validates: Breadth of performance beyond AUROC alone.
+
+Figure_external_baselines_paired_delta_auc
+  Experiment: Paired bootstrap ΔAUROC vs MOSAIC-RASA backbone.
+  Validates: Statistical recheck of incremental gains over backbone.
+
+=== Ablations ===
+
+fig_rasa_lambda_lineplot
+  Experiment: Sweep alignment loss weight λ_align.
+  Validates: Moderate λ improves AUROC; extreme values do not.
+
+fig_modality_ablation_stripplot
+  Experiment: OCT / colposcopy / clinical / fused-visual subsets (Table S3).
+  Validates: Multimodal inputs contribute; no single modality alone is sufficient.
+
+fig_rasa_component_boxenplot
+  Experiment: RASA component removal (alignment, risk head, label consistency).
+  Validates: Which training objectives materially affect downstream performance.
+
+fig_lcad_qc_ablation_barplot
+  Experiment: Pseudo-report QC / weighting strategies (Table S4).
+  Validates: QC variants did not change AUROC under this retrospective setup.
+
+=== Perturbation audit ===
+
+Figure3_modality_perturbation_heatmap
+  Experiment: Mask/shuffle OCT, colposcopy, clinical inputs (n=128).
+  Validates: Largest similarity drop occurs in the matching report section.
+
+Figure3_modality_perturbation_lineplot
+  Experiment: Section-wise degradation profiles per perturbation.
+  Validates: Modality-grounded decoding vs label-only collapse.
+
+Figure3_risk_delta_stripplot
+  Experiment: Risk-score shift under perturbations.
+  Validates: Label-only inference causes largest absolute risk displacement.
+
+Figure_theme1_perturbation_sensitivity_matrix
+  Experiment: Upgraded Theme-1 perturbation matrix (drops + risk shift).
+  Validates: Consolidated audit of section/report/risk sensitivity.
+
+=== Generalisation & robustness ===
+
+fig_loco_heatmap / Figure4_loco_forest_catplot
+  Experiment: Strict leave-one-centre-out retraining (Table S2).
+  Validates: Centre shift remains a limitation; performance is centre-dependent.
+
+SupplementaryFigure_S1_masking_validation
+  Experiment: Label-only vs modality-conditioned agents (Table S10).
+  Validates: Modality-conditioned proxies are more consistent with real reports.
+
+SupplementaryFigure_S3_multiseed
+  Experiment: Multi-seed AUROC stability (Table S7).
+  Validates: Backbone training is reproducible across random seeds.

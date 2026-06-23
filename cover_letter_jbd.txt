@@ -1,0 +1,17 @@
+Dear Editors of Journal of Big Data,
+
+We are pleased to submit our manuscript entitled "MOSAIC: Weak-Oracle Semantic Prior Learning for LLM-Assisted Cross-Modal Cervical Screening Analytics" for consideration as a Research Article in Journal of Big Data.
+
+This manuscript addresses a common but under-studied big-data problem in clinical screening: multimodal image and structured clinical evidence may be available at scale, while clinician-authored report supervision is sparse, centre-dependent, and not missing at random. We study this problem using a restricted-access five-centre retrospective cervical screening cohort containing 1,897 multimodal cases and 137,591 evaluable image files. Because the underlying data contain privacy-sensitive clinical images, report text, pathology information, and centre-level workflow information, the manuscript does not claim release of a public raw dataset. Instead, it contributes a reproducible analytics framework together with aggregate cohort statistics, split-level summaries, code/configuration outputs, non-identifying result tables, and audit material.
+
+The proposed MOSAIC framework converts incomplete report supervision into quality-controlled weak semantic priors. It preserves archived reports, treats pseudo reports as weighted weak-oracle scaffolds rather than clinical documentation, aligns modality-specific representations with structured report sections, and applies train-only semantic retrieval with validation-calibrated risk fusion. On the locked held-out test set, MOSAIC achieved AUROC 0.908, AUPRC 0.741, and F1 0.736, improving over the MOSAIC-RASA backbone with a paired AUROC gain of 0.053 (95% CI, 0.012 to 0.101; p=0.005). We also report same-split external baselines, CIN3+ proxy safety-oriented analysis, semantic-tag leakage audits, perturbation analyses, quality-control stress testing, and centre-shift stress tests.
+
+We have kept the clinical and LLM-related claims deliberately bounded. The manuscript does not claim autonomous clinical decision-making, prospective clinical utility, unrestricted external generalisation, public release of raw clinical data, or direct superiority of LLM-generated semantic tags. Direct LLM-tag rows are reported as unavailable where no configured and audited LLM provider run was present. Leave-one-centre-out results are interpreted as centre-shift stress tests rather than as evidence of external-validation success.
+
+All authors have approved the manuscript for submission. The work is original and is not under consideration elsewhere. Ethics approval, funding, competing interests, author contributions, data availability, and other declarations are included in the manuscript, with institution-specific details to be verified and completed by the authors before final submission.
+
+Thank you for considering our manuscript. We believe the paper is well aligned with Journal of Big Data because it combines a realistic multicentre clinical big-data setting with a leakage-controlled and auditable framework for incomplete multimodal supervision.
+
+Sincerely,
+
+Mengyuan Huang, Yuchen Pei, Yan Zhang, and Yutao Ma
