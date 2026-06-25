@@ -293,6 +293,8 @@ def _save(fig: plt.Figure, name: str) -> None:
     FIGS.mkdir(parents=True, exist_ok=True)
     sns.despine(fig=fig)
     fig.tight_layout()
+    fig.canvas.draw()
+    apply_arial_to_figure(fig)
     fig.savefig(FIGS / f"{name}.png", bbox_inches="tight")
     fig.savefig(FIGS / f"{name}.pdf", bbox_inches="tight")
     plt.close(fig)

@@ -15,7 +15,7 @@ from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Polygon,
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.supplementary.jbd_figure_typography import apply_arial_to_figure
+from src.supplementary.jbd_figure_typography import FONT_TIMES, apply_arial_to_figure
 
 OUT_DIRS = [
     ROOT / "outputs/publishable/figures/main",
@@ -202,9 +202,8 @@ def draw_panel_d(ax: plt.Axes) -> None:
     ax.text(
         0.50,
         0.40,
-        r"$\hat{p}^{MOSAIC}=\sigma[(1-\alpha^*)\mathrm{logit}(\hat{p}^{RASA})$"
-        "\n"
-        r"$+\alpha^*\mathrm{logit}(s^{ret})]$",
+        "p_hat^MOSAIC = sigmoid((1-alpha*) logit(p_hat^RASA)\n"
+        "+ alpha* logit(s_ret))",
         ha="center",
         va="center",
         fontsize=7.1,
@@ -213,6 +212,24 @@ def draw_panel_d(ax: plt.Axes) -> None:
         bbox={"boxstyle": "round,pad=0.3", "facecolor": "#F7F8FB", "edgecolor": "#E1CA9E"},
     )
     ax.text(0.50, 0.04, "alpha* and threshold: validation only", ha="center", fontsize=7.3, color=PALETTE["muted"])
+
+
+def apply_count_typography(fig: plt.Figure) -> None:
+    """Set standalone count strings to Times New Roman after the Arial pass."""
+    count_texts = {
+        "5 centres",
+        "n = 1,897",
+        "137,591\nimages",
+        "744 cases",
+        "1,153 cases",
+        "2,367 entities",
+    }
+    for artist in fig.findobj(match=lambda x: hasattr(x, "get_text") and x.get_text()):
+        try:
+            if artist.get_text() in count_texts:
+                artist.set_fontfamily(FONT_TIMES)
+        except Exception:
+            pass
 
 
 def draw_mosaic_tiles(ax: plt.Axes) -> None:
@@ -277,6 +294,7 @@ def make_figure() -> plt.Figure:
 
 def save_figure(fig: plt.Figure) -> None:
     apply_arial_to_figure(fig)
+    apply_count_typography(fig)
     names = [
         "Figure1_mosaic_overview",
         "Figure1_study_design",

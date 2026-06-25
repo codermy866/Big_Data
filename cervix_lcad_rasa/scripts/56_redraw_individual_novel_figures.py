@@ -18,6 +18,7 @@ import seaborn as sns
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FIG_SRC = PROJECT / "figures"
+FINAL_FIG = PROJECT / "final_Fig"
 
 sys.path.insert(0, str(ROOT))
 
@@ -98,50 +99,161 @@ def _sync_to_project(names: list[str]) -> None:
 
 
 def redraw_theme1_pseudo() -> None:
-    """Seaborn gallery: Dot plot with several variables (FacetGrid strip, no lines)."""
+    """Redraw pseudo-report source comparison with two Seaborn-inspired candidate styles."""
     pseudo = _read(THEME_TAB / "T_theme1_llm_vs_template_rule_pseudo_report.csv")
     if pseudo is None or pseudo.empty:
         return
-    source_map = {"label_template": "Template", "rule_based": "Rule-based", "local_llm": "Local embedding LLM"}
-    palette = {"Template": C0, "Rule-based": C2, "Local embedding LLM": C4}
-    panels = [
-        ("Modality grounding", ["oct_supported_rate", "colposcopy_supported_rate", "instruction_supported_rate", "mean_modality_support_rate"],
-         ["OCT support", "Colposcopy", "Clinical", "Mean support"]),
-        ("Text repetition", ["unique_text_rate", "max_duplicate_fraction"], ["Unique text", "Duplicate fraction"]),
-        ("Label consistency", ["label_consistency_mean"], ["Label consistency"]),
-        ("Alignment MRR", ["latent_alignment_mrr_full_model"], ["Alignment MRR"]),
+    source_map = {"label_template": "Template", "rule_based": "Rule-based", "local_llm": "Local LLM"}
+    source_order = ["Template", "Rule-based", "Local LLM"]
+    metric_specs = [
+        ("Supervision scaffold", "Section complete", "section_complete_rate"),
+        ("Supervision scaffold", "Label consistency", "label_consistency_mean"),
+        ("Modality grounding", "OCT support", "oct_supported_rate"),
+        ("Modality grounding", "Colposcopy support", "colposcopy_supported_rate"),
+        ("Modality grounding", "Clinical support", "instruction_supported_rate"),
+        ("Modality grounding", "Mean support", "mean_modality_support_rate"),
+        ("Text diversity", "Unique text", "unique_text_rate"),
+        ("Text diversity", "Duplicate fraction", "max_duplicate_fraction"),
+        ("Semantic alignment", "Alignment MRR", "latent_alignment_mrr_full_model"),
+        ("Semantic alignment", "Alignment gap", "latent_alignment_gap_full_model"),
     ]
-    frames = []
-    for panel, cols, labels in panels:
-        for col, label in zip(cols, labels):
-            if col not in pseudo.columns:
-                continue
-            for src, val in zip(pseudo["pseudo_report_source"], pseudo[col]):
-                frames.append({"panel": panel, "metric": label, "Source": source_map.get(src, src), "value": float(val)})
+    frames: list[dict[str, object]] = []
+    for group, metric, col in metric_specs:
+        if col not in pseudo.columns:
+            continue
+        for _, row in pseudo.iterrows():
+            src = source_map.get(str(row["pseudo_report_source"]), str(row["pseudo_report_source"]))
+            frames.append({"group": group, "metric": metric, "Source": src, "value": float(row[col]), "source_idx": source_order.index(src)})
     if not frames:
         return
     long = pd.DataFrame(frames)
+    group_order = ["Supervision scaffold", "Modality grounding", "Text diversity", "Semantic alignment"]
+    group_order = [g for g in group_order if g in set(long["group"])]
+    source_palette = {"Template": "#7D8793", "Rule-based": "#254B6D", "Local LLM": "#C65A46"}
+    metric_palette = {
+        "Section complete": "#95A1B2",
+        "Label consistency": "#254B6D",
+        "OCT support": "#254B6D",
+        "Colposcopy support": "#557A95",
+        "Clinical support": "#95A1B2",
+        "Mean support": "#C65A46",
+        "Unique text": "#254B6D",
+        "Duplicate fraction": "#C65A46",
+        "Alignment MRR": "#254B6D",
+        "Alignment gap": "#95A1B2",
+    }
+
     setup_novel_theme()
-    g = sns.FacetGrid(long, col="panel", col_wrap=2, height=3.1, aspect=1.25, sharex=False, sharey=False)
-    g.map_dataframe(
-        sns.stripplot,
-        x="value",
-        y="metric",
-        hue="Source",
-        palette=palette,
-        dodge=True,
-        size=9,
-        jitter=0.12,
-        orient="h",
-        linewidth=0.8,
-        edgecolor=TEXT_DARK,
+    fig_h, axes_h = plt.subplots(2, 2, figsize=(11.2, 7.4), constrained_layout=True)
+    fig_h._jbd_min_font_size_override = 8.8
+    fig_h._jbd_max_font_size_override = 14.5
+    for ax, group in zip(axes_h.flat, group_order):
+        sub = long[long["group"].eq(group)].copy()
+        matrix = sub.pivot_table(index="Source", columns="metric", values="value", aggfunc="mean").reindex(source_order)
+        matrix = matrix[[m for m in sub["metric"].drop_duplicates().tolist() if m in matrix.columns]]
+        vmax = max(0.10, float(np.nanmax(matrix.to_numpy())) * 1.05)
+        sns.heatmap(
+            matrix,
+            ax=ax,
+            cmap=sns.light_palette("#254B6D", as_cmap=True),
+            vmin=0,
+            vmax=vmax,
+            annot=True,
+            fmt=".3f",
+            linewidths=0.85,
+            linecolor="white",
+            cbar=False,
+            annot_kws={"fontsize": 8.4, "fontfamily": "Arial", "color": "#17212B"},
+        )
+        ax.set_title(group, fontweight="bold", fontsize=12, color="#17212B", pad=8)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.tick_params(axis="x", rotation=30, labelsize=9.0)
+        ax.tick_params(axis="y", rotation=0, labelsize=9.0)
+    for ax in axes_h.flat[len(group_order):]:
+        ax.set_visible(False)
+    fig_h.suptitle("Pseudo-report source profile: trivariate categorical heatmap candidate", fontsize=14, fontweight="bold", color="#17212B")
+    save_many(
+        fig_h,
+        _stems(
+            "Figure_theme1_pseudo_report_source_comparison_trivariate_hist",
+            OUT_THEME,
+            OUT_PUB,
+            FIG_SRC,
+            FINAL_FIG,
+        ),
     )
-    g.set_axis_labels("Rate / MRR", "")
-    g.set_titles("{col_name}", size=10, weight="bold")
-    g.add_legend(title="Source", adjust_subtitles=True)
-    g.fig.suptitle("Pseudo-report source profile", fontsize=10, fontweight="bold", y=1.02)
-    apply_arial_to_figure(g.fig)
-    save_many(g.fig, _stems("Figure_theme1_pseudo_report_source_comparison", OUT_THEME, OUT_PUB, FIG_SRC))
+
+    setup_novel_theme()
+    fig_s, axes_s = plt.subplots(2, 2, figsize=(11.4, 7.3), constrained_layout=True)
+    fig_s._jbd_min_font_size_override = 8.8
+    fig_s._jbd_max_font_size_override = 14.5
+    for ax, group in zip(axes_s.flat, group_order):
+        sub = long[long["group"].eq(group)].copy()
+        metrics = sub["metric"].drop_duplicates().tolist()
+        offsets = np.linspace(-0.17, 0.17, len(metrics)) if len(metrics) > 1 else np.array([0.0])
+        for metric, off in zip(metrics, offsets):
+            msub = sub[sub["metric"].eq(metric)].sort_values("source_idx")
+            ax.scatter(
+                msub["source_idx"] + off,
+                msub["value"],
+                s=76,
+                color=metric_palette.get(metric, "#254B6D"),
+                edgecolor="#17212B",
+                linewidth=0.65,
+                alpha=0.92,
+                label=metric,
+                zorder=4,
+            )
+        mean_by_source = sub.groupby("source_idx", as_index=False)["value"].mean().sort_values("source_idx")
+        if len(mean_by_source) >= 2:
+            ax.plot(
+                mean_by_source["source_idx"],
+                mean_by_source["value"],
+                color="#17212B",
+                linewidth=2.05,
+                alpha=0.85,
+                zorder=2,
+            )
+        ax.set_xticks(range(len(source_order)))
+        ax.set_xticklabels(source_order, rotation=0, fontweight="bold")
+        ax.set_title(group, fontweight="bold", fontsize=12, color="#17212B", pad=8)
+        ax.set_xlabel("")
+        ax.set_ylabel("Metric value")
+        if group in {"Supervision scaffold", "Modality grounding"}:
+            ax.set_ylim(-0.05, 1.05)
+        else:
+            lo = float(sub["value"].min())
+            hi = float(sub["value"].max())
+            pad = max((hi - lo) * 0.22, 0.01)
+            ax.set_ylim(max(0.0, lo - pad), hi + pad)
+        ax.grid(True, axis="y", color="#E2E7EE", linewidth=0.85, alpha=0.82)
+        ax.grid(False, axis="x")
+        leg = ax.legend(frameon=False, fontsize=8.2, loc="best", handletextpad=0.35)
+        if leg is not None:
+            for text in leg.get_texts():
+                text.set_fontfamily("Arial")
+        sns.despine(ax=ax)
+    for ax in axes_s.flat[len(group_order):]:
+        ax.set_visible(False)
+    fig_s.suptitle("Pseudo-report source profile: strip observations with source-mean trend", fontsize=14, fontweight="bold", color="#17212B")
+    save_many(
+        fig_s,
+        _stems(
+            "Figure_theme1_pseudo_report_source_comparison",
+            OUT_THEME,
+            OUT_PUB,
+            FIG_SRC,
+            FINAL_FIG,
+        )
+        + _stems(
+            "Figure_theme1_pseudo_report_source_comparison_regression_strip",
+            OUT_THEME,
+            OUT_PUB,
+            FIG_SRC,
+            FINAL_FIG,
+        ),
+    )
 
 
 def redraw_theme1_alignment() -> None:
