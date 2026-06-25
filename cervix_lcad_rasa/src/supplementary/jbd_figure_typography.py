@@ -71,8 +71,6 @@ def apply_arial_to_figure(fig: plt.Figure) -> None:
             if leg.get_title() is not None:
                 leg.get_title().set_fontfamily(FONT_ARIAL)
     setattr(fig, "_jbd_font_size_boosted", True)
-    if not bool(getattr(fig, "_jbd_disable_numeric_times", False)):
-        _apply_numeric_times(fig)
 
 
 def _text_uses_times(text: str) -> bool:
@@ -90,7 +88,7 @@ def _text_uses_times(text: str) -> bool:
     if "/" in t and any(ch.isdigit() for ch in t):
         return True
     try:
-        float(t.replace(",", ""))
+        float(t)
         return True
     except ValueError:
         return False
@@ -122,23 +120,6 @@ def apply_mixed_en_typography(fig: plt.Figure) -> None:
                 artist.set_fontfamily(FONT_TIMES)
             elif any(ch.isalpha() for ch in text):
                 artist.set_fontfamily(FONT_ARIAL)
-        except Exception:
-            pass
-
-
-def _apply_numeric_times(fig: plt.Figure) -> None:
-    """Use Times New Roman for standalone numeric text while keeping labels in Arial."""
-    for ax in fig.get_axes():
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            try:
-                if _text_uses_times(label.get_text()):
-                    label.set_fontfamily(FONT_TIMES)
-            except Exception:
-                pass
-    for artist in fig.findobj(match=lambda x: hasattr(x, "get_text") and x.get_text()):
-        try:
-            if _text_uses_times(artist.get_text()):
-                artist.set_fontfamily(FONT_TIMES)
         except Exception:
             pass
 

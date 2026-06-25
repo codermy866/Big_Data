@@ -55,188 +55,71 @@ SCATTER_DISPLAY_OFFSETS = {
 
 PALETTE_REAL_PSEUDO = {"Real reports": C0, "Pseudo-report candidates": C4}
 
-# Style F clean clinical palette: low-saturation, colour-blind aware, print-readable.
-FIG2_EARTH_PALETTE = {
-    "Report-rich": "#254B6D",
-    "Report-sparse": "#C65A46",
-    "Report-absent": "#7D8793",
-}
-FIG2_EARTH_TEXT = "#17212B"
-FIG2_EARTH_GRID = "#E2E7EE"
-FIG2_EARTH_REF = "#95A1B2"
+# Style F earth-tone palette (user-specified).
+FIG2_EARTH_PALETTE = ["#E1CA9E", "#ADB093", "#998560", "#3E3425"]
+FIG2_EARTH_TEXT = "#3E3425"
 FIG2_EARTH_REAL_PSEUDO = {
-    "Real reports": "#254B6D",
-    "Pseudo-report candidates": "#F0F3F7",
+    "Real reports": "#3E3425",
+    "Pseudo-report candidates": "#E1CA9E",
 }
-FIG2_KDE_FILL_ALPHA = 0.78
-FIG2_BAR_DARK_ALPHA = 0.96
-FIG2_KDE_EDGE = "#C8D1DC"
-FIG2_BAR_HEIGHT = 0.56
-FIG2_STYLE_F_SUPTITLE_SIZE = 18.5
-FIG2_STYLE_F_TITLE_SIZE = 16.4
-FIG2_STYLE_F_LABEL_SIZE = 15.0
-FIG2_STYLE_F_TICK_SIZE = 14.0
-FIG2_STYLE_F_LEGEND_SIZE = 13.2
-FIG2_STYLE_F_ANNOT_SIZE = 13.5
-
-
-def _format_coverage_label(coverage: float) -> str:
-    pct = coverage * 100.0
-    if np.isclose(pct, round(pct)):
-        return f"{int(round(pct))}%"
-    return f"{pct:.1f}%"
+FIG2_KDE_FILL_ALPHA = 0.52
+FIG2_BAR_DARK_ALPHA = 0.62
+FIG2_KDE_EDGE = "#FFFFFF"
+FIG2_BAR_HEIGHT = 0.52
 
 
 def _horizontal_bar_supervision_panel(ax: plt.Axes, data: pd.DataFrame, earth_rp: dict[str, str]) -> pd.DataFrame:
-    """Single-panel stacked bars: real reports + pseudo-report candidates = total cases."""
+    """Seaborn-style overlapping horizontal bars: total cases (light) + real reports (dark)."""
     plot_data = data.sort_values("Cases", ascending=False).reset_index(drop=True)
     centres = plot_data["Centre label"].astype(str).tolist()
     y = np.arange(len(centres))
-    real = plot_data["Real reports"].to_numpy(dtype=float)
-    pseudo = plot_data["Pseudo-report candidates"].to_numpy(dtype=float)
-    cases = plot_data["Cases"].to_numpy(dtype=float)
-    max_cases = float(np.nanmax(cases))
 
     ax.barh(
         y,
-        real,
+        plot_data["Cases"],
+        height=FIG2_BAR_HEIGHT,
+        color=earth_rp["Pseudo-report candidates"],
+        alpha=FIG2_KDE_FILL_ALPHA,
+        edgecolor=FIG2_EARTH_TEXT,
+        linewidth=0.55,
+        label="Total cases",
+        zorder=1,
+    )
+    ax.barh(
+        y,
+        plot_data["Real reports"],
         height=FIG2_BAR_HEIGHT,
         color=earth_rp["Real reports"],
         alpha=FIG2_BAR_DARK_ALPHA,
         edgecolor=FIG2_EARTH_TEXT,
-        linewidth=0.82,
-        label="Archived real reports",
+        linewidth=0.55,
+        label="Real reports",
         zorder=2,
     )
-    ax.barh(
-        y,
-        pseudo,
-        left=real,
-        height=FIG2_BAR_HEIGHT,
-        color=earth_rp["Pseudo-report candidates"],
-        alpha=FIG2_KDE_FILL_ALPHA,
-        edgecolor=FIG2_KDE_EDGE,
-        linewidth=0.82,
-        label="Pseudo-report candidates",
-        zorder=1,
-    )
-
-    for yi, (_, row) in enumerate(plot_data.iterrows()):
-        real_n = int(row["Real reports"])
-        pseudo_n = int(row["Pseudo-report candidates"])
-        coverage = float(row["Real-report coverage"])
-        if real_n >= 35:
-            ax.text(
-                real_n / 2,
-                yi,
-                f"{real_n}",
-                ha="center",
-                va="center",
-                fontsize=FIG2_STYLE_F_ANNOT_SIZE,
-                fontfamily=FONT_TIMES,
-                fontweight="bold",
-                color="white",
-                zorder=4,
-            )
-        if pseudo_n >= 35:
-            ax.text(
-                real_n + pseudo_n / 2,
-                yi,
-                f"{pseudo_n}",
-                ha="center",
-                va="center",
-                fontsize=FIG2_STYLE_F_ANNOT_SIZE,
-                fontfamily=FONT_TIMES,
-                fontweight="bold",
-                color=FIG2_EARTH_TEXT,
-                zorder=4,
-            )
-        ax.text(
-            max_cases + 22,
-            yi,
-            f"{_format_coverage_label(coverage)}   {real_n}/{pseudo_n}",
-            ha="left",
-            va="center",
-            fontsize=FIG2_STYLE_F_ANNOT_SIZE,
-            fontfamily=FONT_TIMES,
-            fontweight="bold",
-            color=FIG2_EARTH_TEXT,
-            zorder=4,
-        )
-
-    ax.text(
-        max_cases + 22,
-        -0.64,
-        "Coverage   real/pseudo",
-        ha="left",
-        va="bottom",
-        fontsize=FIG2_STYLE_F_LEGEND_SIZE,
-        fontfamily=FONT_ARIAL,
-        fontweight="bold",
-        color=FIG2_EARTH_TEXT,
-    )
-
     ax.set_yticks(y)
-    ax.set_yticklabels(
-        centres,
-        fontsize=FIG2_STYLE_F_TICK_SIZE,
-        fontfamily=FONT_ARIAL,
-        fontweight="bold",
-        color=FIG2_EARTH_TEXT,
-    )
+    ax.set_yticklabels(centres, fontfamily=FONT_ARIAL, color=FIG2_EARTH_TEXT)
     ax.invert_yaxis()
-    ax.set_xlabel(
-        "Number of cases per centre",
-        fontsize=FIG2_STYLE_F_LABEL_SIZE,
-        fontfamily=FONT_ARIAL,
-        fontweight="bold",
-        color=FIG2_EARTH_TEXT,
-        labelpad=16,
-    )
-    ax.set_title("")
-    ax.set_xlim(0, max_cases + 160)
-    ax.set_xticks(np.arange(0, int(max_cases) + 1, 100))
-    ax.tick_params(axis="both", labelsize=FIG2_STYLE_F_TICK_SIZE, colors=FIG2_EARTH_TEXT)
-    for label in ax.get_xticklabels() + ax.get_yticklabels():
-        label.set_fontweight("bold")
+    ax.set_xlabel("Number of cases", fontfamily=FONT_ARIAL, color=FIG2_EARTH_TEXT)
+    ax.set_title("Supervision case counts by centre", fontweight="bold", pad=8, fontfamily=FONT_ARIAL, color=FIG2_EARTH_TEXT)
+    ax.tick_params(axis="x", colors=FIG2_EARTH_TEXT)
     ax.set_axisbelow(True)
-    ax.grid(axis="x", color=FIG2_EARTH_GRID, alpha=0.72, zorder=0)
+    ax.grid(axis="x", color="#ADB093", alpha=0.22, zorder=0)
     for sp in ("top", "right", "left"):
         ax.spines[sp].set_visible(False)
-    leg = ax.legend(
-        frameon=False,
-        loc="lower center",
-        bbox_to_anchor=(0.50, -0.29),
-        ncol=2,
-        fontsize=FIG2_STYLE_F_LEGEND_SIZE,
-        handlelength=1.8,
-        handletextpad=0.9,
-        columnspacing=2.6,
-        borderaxespad=0.0,
-    )
+    leg = ax.legend(frameon=False, loc="lower right")
     if leg.get_title() is not None:
         leg.get_title().set_fontfamily(FONT_ARIAL)
     for text in leg.get_texts():
         text.set_fontfamily(FONT_ARIAL)
-        text.set_fontweight("bold")
         text.set_color(FIG2_EARTH_TEXT)
     return plot_data
 
 
 def _palette_map_earth(data: pd.DataFrame) -> dict[str, str]:
-    """Map centres by report-supervision state rather than arbitrary rainbow colours."""
-    pal: dict[str, str] = {}
-    for _, row in data.iterrows():
-        centre = str(row["Centre label"])
-        coverage = float(row["Real-report coverage"])
-        if coverage >= 0.5:
-            key = "Report-rich"
-        elif coverage > 0:
-            key = "Report-sparse"
-        else:
-            key = "Report-absent"
-        pal[centre] = FIG2_EARTH_PALETTE[key]
-    return pal
+    """One distinct earth-palette colour per centre."""
+    centres = data["Centre label"].astype(str).tolist()
+    order = ["#3E3425", "#998560", "#ADB093", "#E1CA9E", "#998560"]
+    return {c: order[i % len(order)] for i, c in enumerate(centres)}
 
 
 def _prepare_figure2_style() -> None:
@@ -291,49 +174,28 @@ def _coverage_lollipop_panel(
         c = pal[str(row["Centre label"])]
         yi = int(i)
         cov = float(row["Real-report coverage"])
-        ax_r.hlines(yi, 0, cov, color=c, lw=4.2, alpha=stem_alpha, zorder=1)
-        ax_r.scatter(cov, yi, s=190, marker="D", c=c, edgecolors=text_color, linewidths=1.05, zorder=3, alpha=0.96)
+        ax_r.hlines(yi, 0, cov, color=c, lw=3.0, alpha=stem_alpha, zorder=1)
+        ax_r.scatter(cov, yi, s=140, marker="D", c=c, edgecolors=text_color, linewidths=0.85, zorder=3, alpha=0.92)
         ax_r.text(
             1.04,
             yi,
             f"{int(row['Real reports'])} / {int(row['Pseudo-report candidates'])}",
             va="center",
             ha="left",
-            fontsize=FIG2_STYLE_F_ANNOT_SIZE,
+            fontsize=10,
             fontfamily=FONT_TIMES,
-            fontweight="bold",
             color=text_color,
         )
-    ax_r.axvline(0.5, color=refline_color, ls=(0, (3, 3)), lw=1.15, alpha=0.66)
+    ax_r.axvline(0.5, color=refline_color, ls=(0, (3, 3)), lw=0.9, alpha=0.55)
     ax_r.set_yticks(y)
-    ax_r.set_yticklabels(
-        data["Centre label"].astype(str),
-        fontsize=FIG2_STYLE_F_TICK_SIZE,
-        fontfamily=FONT_ARIAL,
-        fontweight="bold",
-    )
+    ax_r.set_yticklabels(data["Centre label"].astype(str), fontfamily=FONT_ARIAL)
     ax_r.set_xlim(-0.05, 1.22)
     ax_r.set_ylim(len(data) - 0.55, -0.55)
-    ax_r.set_xlabel(
-        "Real-report coverage",
-        fontsize=FIG2_STYLE_F_LABEL_SIZE,
-        fontfamily=FONT_ARIAL,
-        fontweight="bold",
-        color=text_color,
-    )
-    ax_r.set_title(
-        "Coverage and report counts",
-        fontsize=FIG2_STYLE_F_TITLE_SIZE,
-        fontweight="bold",
-        pad=10,
-        fontfamily=FONT_ARIAL,
-        color=text_color,
-    )
-    ax_r.tick_params(axis="both", labelsize=FIG2_STYLE_F_TICK_SIZE, colors=text_color)
+    ax_r.set_xlabel("Real-report coverage", fontfamily=FONT_ARIAL, color=text_color)
+    ax_r.set_title("Coverage and report counts", fontweight="bold", pad=8, fontfamily=FONT_ARIAL, color=text_color)
+    ax_r.tick_params(colors=text_color)
     ax_r.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(round(x * 100))}%"))
-    for label in ax_r.get_xticklabels() + ax_r.get_yticklabels():
-        label.set_fontweight("bold")
-    ax_r.grid(axis="x", color=grid_color, alpha=0.70)
+    ax_r.grid(axis="x", color=grid_color, alpha=0.28)
     for sp in ("top", "right", "left"):
         ax_r.spines[sp].set_visible(False)
 
@@ -566,25 +428,35 @@ def style_f_conditional_kde(
     *,
     style_tag: str | None = None,
 ) -> plt.Figure:
-    """Seaborn ref: Horizontal bar plots — one stacked bar per centre."""
+    """Seaborn ref: Horizontal bar plots — overlapping total + real-report bars, with coverage panel."""
+    pal = _palette_map_earth(data)
     earth_rp = FIG2_EARTH_REAL_PSEUDO
-    fig, ax = plt.subplots(figsize=(11.8, 6.55))
-    fig._jbd_min_font_size_override = 12.5
-    fig._jbd_max_font_size_override = 19.0
+    fig, (ax_b, ax_r) = plt.subplots(1, 2, figsize=(13.8, 6.0), gridspec_kw={"width_ratios": [1.12, 1.0], "wspace": 0.34})
+    fig._jbd_max_font_size_override = 12.0
     fig._jbd_mixed_en_typography = True
 
-    _horizontal_bar_supervision_panel(ax, data, earth_rp)
+    plot_data = _horizontal_bar_supervision_panel(ax_b, data, earth_rp)
+
+    _coverage_lollipop_panel(
+        ax_r,
+        plot_data,
+        pal,
+        text_color=FIG2_EARTH_TEXT,
+        grid_color="#ADB093",
+        refline_color="#998560",
+        stem_alpha=0.78,
+    )
 
     fig.suptitle(
-        "Centre-level cohort scale and report-supervision composition",
-        fontsize=FIG2_STYLE_F_SUPTITLE_SIZE,
+        "Centre-level cohort scale and report-supervision imbalance",
+        fontsize=12,
         fontweight="bold",
-        y=0.99,
+        y=0.98,
         fontfamily=FONT_ARIAL,
         color=FIG2_EARTH_TEXT,
     )
     if style_tag:
-        fig.text(0.99, 0.02, style_tag, ha="right", fontsize=10.5, color=FIG2_EARTH_REF, fontfamily=FONT_ARIAL)
+        fig.text(0.99, 0.02, style_tag, ha="right", fontsize=8.5, color=C6, fontfamily=FONT_ARIAL)
     return fig
 
 
