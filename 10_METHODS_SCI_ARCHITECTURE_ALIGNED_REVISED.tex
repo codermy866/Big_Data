@@ -1,0 +1,469 @@
+\section{Method}
+\label{sec:methods}
+
+MOSAIC is formulated as a leakage controlled framework for case level cervical disease risk classification under incomplete report supervision. The final output is a binary risk probability for each examination case. The report related components provide auxiliary semantic supervision and train only semantic priors. They do not redefine the clinical endpoint, replace the classifier, or treat generated text as ground truth. The method follows the model architecture in a direct order: the classification problem is defined, the overall framework is introduced, multimodal evidence is encoded, missing report supervision is completed through LCAD, report anchored representation learning is performed through RASA, and the final MOSAIC probability is obtained through train only semantic retrieval and validation calibrated fusion.
+
+\subsection{Problem Definition}
+\label{subsec:methods_problem_definition}
+
+This subsection defines the supervised learning task and separates it from the auxiliary report semantics used by MOSAIC. The key point is that the final task is not report generation. It is binary case level classification, where structured report semantics are used to improve representation learning when clinician authored reports are incomplete.
+
+\subsubsection{Case level binary risk classification}
+\label{subsubsec:case_level_binary_classification}
+
+Let the analytic cohort be denoted by
+\begin{equation}
+\mathcal{D}=\{(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin},y_i,c_i,a_i,r_i^{arc})\}_{i=1}^{N}.
+\label{eq:dataset_definition}
+\end{equation}
+In Eq.~\eqref{eq:dataset_definition}, $\mathcal{D}$ is the full cohort, $i$ indexes an examination case, and $N$ is the number of cases. The variables $x_i^{oct}$, $x_i^{col}$, $x_i^{fus}$, and $x_i^{clin}$ denote optical coherence tomography (OCT) evidence, colposcopy evidence, fused visual evidence, and structured clinical evidence for case $i$, respectively. The label $y_i\in\{0,1\}$ is the locked high risk reference label. The symbol $c_i$ denotes the centre identifier, $a_i=\mathbb{I}(r_i^{arc}\ \mathrm{available})$ is the archived report availability indicator, and $r_i^{arc}$ is the archived clinician authored report when available. Centre identifiers are used for data splitting, report availability analysis, and centre shift audit, but they are not used as predictive input features.
+
+The four evidence streams for case $i$ can be grouped as
+\begin{equation}
+x_i=\{x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin}\}.
+\label{eq:case_evidence_group}
+\end{equation}
+In Eq.~\eqref{eq:case_evidence_group}, $x_i$ denotes the complete permitted multimodal evidence for case $i$. This compact notation is used only for equations where the four evidence streams are processed together.
+
+The supervised endpoint is defined as
+\begin{equation}
+y_i=
+\begin{cases}
+1, & \text{if case } i \text{ satisfies the predefined high risk criterion},\\
+0, & \text{otherwise}.
+\end{cases}
+\label{eq:binary_endpoint}
+\end{equation}
+Here, $y_i=1$ denotes a high risk case under the locked clinical reference definition, and $y_i=0$ denotes a non high risk case. In the reported cervical screening experiments, the primary high risk endpoint corresponds to CIN2+. CIN3+ is used only for safety oriented audit when explicitly stated.
+
+The data are partitioned before statement generation and model development:
+\begin{equation}
+\mathcal{D}=\mathcal{D}_{tr}\cup\mathcal{D}_{val}\cup\mathcal{D}_{te},
+\qquad
+\mathcal{D}_{a}\cap\mathcal{D}_{b}=\emptyset\quad(a\neq b).
+\label{eq:data_partition}
+\end{equation}
+In Eq.~\eqref{eq:data_partition}, $\mathcal{D}_{tr}$, $\mathcal{D}_{val}$, and $\mathcal{D}_{te}$ denote the training, validation, and held out test splits. The symbols $a$ and $b$ index any two distinct splits. The split is case based to avoid leakage across multiple images from the same examination.
+
+The final classifier is a function
+\begin{equation}
+f_{\Theta}:\mathcal{X}^{oct}\times\mathcal{X}^{col}\times\mathcal{X}^{fus}\times\mathcal{X}^{clin}\rightarrow[0,1],
+\qquad
+\hat{p}_i=f_{\Theta}(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin}).
+\label{eq:final_classifier_definition}
+\end{equation}
+In Eq.~\eqref{eq:final_classifier_definition}, $\mathcal{X}^{oct}$, $\mathcal{X}^{col}$, $\mathcal{X}^{fus}$, and $\mathcal{X}^{clin}$ are the input spaces of the four evidence streams. The parameter set of the classifier is denoted by $\Theta$, and $\hat{p}_i$ estimates $\Pr(y_i=1\mid x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin})$. A threshold $\tau$ converts the probability into a binary decision:
+\begin{equation}
+\hat{y}_i(\tau)=\mathbb{I}(\hat{p}_i\geq\tau).
+\label{eq:binary_decision_rule}
+\end{equation}
+In Eq.~\eqref{eq:binary_decision_rule}, $\hat{y}_i(\tau)$ is the predicted binary label at threshold $\tau$, and $\mathbb{I}(\cdot)$ is the indicator function. Equations~\eqref{eq:final_classifier_definition} and~\eqref{eq:binary_decision_rule} define the final problem solved by MOSAIC. The method is a binary risk classifier with auxiliary semantic supervision.
+
+For a supervised mini batch $\mathcal{C}_{risk}$ sampled from the training split, the classification loss is
+\begin{equation}
+\mathcal{L}_{risk}
+=
+-\frac{1}{|\mathcal{C}_{risk}|}
+\sum_{i\in\mathcal{C}_{risk}}
+\left[y_i\log\hat{p}_i+(1-y_i)\log(1-\hat{p}_i)\right].
+\label{eq:classification_objective}
+\end{equation}
+Here, $\mathcal{L}_{risk}$ is the binary cross entropy loss, $|\mathcal{C}_{risk}|$ is the number of cases in the mini batch, $y_i$ is the locked binary label, and $\hat{p}_i$ is the predicted risk probability. The semantic losses introduced later regularise the representation, but they do not change the definition of the supervised classification task.
+
+\subsubsection{Report supervision as an auxiliary source}
+\label{subsubsec:report_supervision_auxiliary_source}
+
+Report availability is incomplete and centre dependent. The centre conditional report availability is written as
+\begin{equation}
+\pi_c=\Pr(a_i=1\mid c_i=c).
+\label{eq:report_availability_distribution}
+\end{equation}
+In Eq.~\eqref{eq:report_availability_distribution}, $\pi_c$ is the probability that a case from centre $c$ has an archived report, $a_i$ is the report availability indicator from Eq.~\eqref{eq:dataset_definition}, and $\Pr(\cdot)$ denotes probability. Because $\pi_c$ may vary by centre, report availability is not treated as random annotation dropout. It is modelled as part of the retrospective data structure.
+
+MOSAIC separates risk labels from semantic supervision. The risk label $y_i$ supervises the classifier. Archived reports and accepted generated statements supervise the report aware representation branch. Let $r_i^{\star}$ denote the effective semantic target for case $i$:
+\begin{equation}
+r_i^{\star}
+=
+\begin{cases}
+r_i^{arc}, & a_i=1,\\
+\mathrm{Flatten}(C_i), & a_i=0\ \mathrm{and}\ \omega_i>0,\\
+\varnothing, & a_i=0\ \mathrm{and}\ \omega_i=0.
+\end{cases}
+\label{eq:semantic_target_definition}
+\end{equation}
+In Eq.~\eqref{eq:semantic_target_definition}, $r_i^{\star}$ is the semantic target admitted to report aware learning, $C_i$ is the structured semantic statement object generated for a report missing case, and $\omega_i$ is its semantic supervision weight. The operator $\mathrm{Flatten}(\cdot)$ converts the structured object into the section interface used by RASA. The symbol $\varnothing$ means that no semantic target is admitted for the case.
+
+The risk supervision set and semantic supervision set are therefore defined separately:
+\begin{equation}
+\mathcal{D}_{tr}^{risk}=\{(i,y_i):i\in\mathcal{D}_{tr}\},
+\qquad
+\mathcal{D}_{tr}^{sem}=\{(i,r_i^{\star},\omega_i):i\in\mathcal{D}_{tr},\omega_i>0\}.
+\label{eq:risk_semantic_sets}
+\end{equation}
+Here, $\mathcal{D}_{tr}$ is the training split, $\mathcal{D}_{tr}^{risk}$ is the set used for supervised classification, and $\mathcal{D}_{tr}^{sem}$ is the set used for semantic reconstruction, section alignment, and semantic bank construction. A case whose generated statement fails audit can still contribute to $\mathcal{D}_{tr}^{risk}$ through its label $y_i$.
+
+\subsubsection{Endpoint provenance and leakage boundary}
+\label{subsubsec:endpoint_provenance_leakage_boundary}
+
+The locked label $y_i$ is fixed before model training, statement generation, semantic bank construction, and test evaluation. Where definitive histopathology, downstream excision, or treatment linked mapping is available, these sources take precedence. When definitive mapping is unavailable in the retrospective archive, a prespecified OCT and clinical second read reference recorded in the locked registry may be used as fallback supervision. This policy defines $y_i$ as a clinically harmonised high risk label rather than a uniformly pathology only endpoint.
+
+The leakage boundary is explicit. The LLM API receives only de identified permitted evidence summaries and a fixed label free schema. It does not receive CIN2+ or CIN3+ labels, histopathology, pathology derived outcomes, split identity, centre identity, patient identifiers, image paths, or raw images. Training labels are used by the risk branch and, after train only retrieval, as local labels attached to retrieved training bank neighbours. They are not used to generate statements or to compute semantic similarity.
+
+\subsection{Overall Architecture of MOSAIC}
+\label{subsec:overall_architecture}
+
+This subsection connects the formal classification task to the implemented architecture. MOSAIC contains three modelling stages. LCAD constructs admissible semantic targets for cases with missing archived reports. RASA learns multimodal representations using these report section targets while also predicting the binary risk score. Train only retrieval converts the learned semantic space into a local semantic prior that is fused with the RASA score.
+
+At the classification pathway level, the mapping is
+\begin{equation}
+(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin})
+\xrightarrow{\mathrm{Encode}}
+h_i
+\xrightarrow{\mathrm{RASA}}
+\hat{p}_i^{RASA}
+\xrightarrow{\mathrm{Fusion}}
+\hat{p}_i^{MOSAIC}.
+\label{eq:mosaic_mapping}
+\end{equation}
+In Eq.~\eqref{eq:mosaic_mapping}, $h_i$ is the fused case representation, $\hat{p}_i^{RASA}$ is the backbone risk probability, and $\hat{p}_i^{MOSAIC}$ is the final MOSAIC probability after retrieval calibrated fusion. The arrows denote the order of computation rather than separate supervised tasks.
+
+The auxiliary semantic pathway is
+\begin{equation}
+r_i^{\star}
+\xrightarrow{\mathrm{SectionPool}}
+\{g_i^{oct},g_i^{col},g_i^{clin},g_i^{imp}\}.
+\label{eq:semantic_anchor_mapping}
+\end{equation}
+In Eq.~\eqref{eq:semantic_anchor_mapping}, $r_i^{\star}$ is the admitted semantic target from Eq.~\eqref{eq:semantic_target_definition}. The vectors $g_i^{oct}$, $g_i^{col}$, $g_i^{clin}$, and $g_i^{imp}$ are section level semantic proxies for OCT findings, colposcopy findings, clinical context, and integrated impression. These proxies guide representation learning. They are not diagnostic labels.
+
+\begin{algorithm}[!t]
+\scriptsize
+\caption{MOSAIC training and inference protocol}
+\label{alg:mosaic_protocol}
+\begin{algorithmic}[1]
+\State \textbf{Input:} training split $\mathcal{D}_{tr}$, validation split $\mathcal{D}_{val}$, test split $\mathcal{D}_{te}$, fixed prompt $P$, schema $\mathcal{S}$, and section set $\mathcal{K}=\{oct,col,clin,imp\}$.
+\State \textbf{Output:} final probability $\hat{p}_i^{MOSAIC}$ and binary decision $\hat{y}_i^{MOSAIC}$.
+\Statex
+\State \textbf{Stage I.} Construct $r_i^{\star}$ and $\omega_i$ for each $i\in\mathcal{D}_{tr}$ using archived reports or audited label free statements.
+\State \textbf{Stage II.} Optimise the RASA backbone with the classification loss, semantic reconstruction loss, and section alignment loss.
+\State \textbf{Stage III.} Build the semantic bank only from $\mathcal{D}_{tr}^{sem}$, select fusion parameters on $\mathcal{D}_{val}$, and evaluate $\hat{p}_i^{MOSAIC}$ on $\mathcal{D}_{te}$ without inserting validation or test cases into the bank.
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:mosaic_protocol} summarises the information flow. The following subsections describe each stage in the same order as the architecture.
+
+\subsection{Multimodal Evidence Encoding}
+\label{subsec:multimodal_evidence_encoding}
+
+This subsection describes the input representation shared by all downstream modules. The aim is to convert heterogeneous OCT, colposcopy, fused visual, and structured clinical evidence into a common latent space while excluding report text, centre identifiers, and outcome variables from the predictive inputs.
+
+\subsubsection{Visual and clinical feature interface}
+\label{subsubsec:feature_interface}
+
+OCT, colposcopy, and fused visual evidence are represented by cached case level embeddings:
+\begin{equation}
+v_i^{oct},v_i^{col},v_i^{fus}\in\mathbb{R}^{2048}.
+\label{eq:visual_embeddings}
+\end{equation}
+In Eq.~\eqref{eq:visual_embeddings}, $v_i^{oct}$, $v_i^{col}$, and $v_i^{fus}$ are 2048 dimensional embeddings for OCT evidence, colposcopy evidence, and fused visual evidence from case $i$. These embeddings are computed before MOSAIC training and treated as fixed inputs. If a case contains multiple images, image level embeddings are aggregated into case level embeddings using a deterministic pooling rule fixed before training.
+
+Structured clinical evidence is encoded as
+\begin{equation}
+u_i\in\mathbb{R}^{32}.
+\label{eq:clinical_vector}
+\end{equation}
+In Eq.~\eqref{eq:clinical_vector}, $u_i$ is a 32 dimensional vector derived from permitted structured variables such as age, human papillomavirus status, and ThinPrep cytologic test category when available. Report text, generated statements, centre identifiers, pathology derived variables, and outcome labels are excluded from $u_i$ and from the cached visual embeddings.
+
+\subsubsection{Projection into a shared representation space}
+\label{subsubsec:shared_representation_space}
+
+Each evidence stream is mapped into a shared hidden space:
+\begin{equation}
+\begin{aligned}
+h_i^{oct} &= W_{oct}v_i^{oct}+b_{oct}, &
+h_i^{col} &= W_{col}v_i^{col}+b_{col},\\
+h_i^{fus} &= W_{fus}v_i^{fus}+b_{fus}, &
+h_i^{clin} &= W_{clin}u_i+b_{clin}.
+\end{aligned}
+\label{eq:modality_projection}
+\end{equation}
+In Eq.~\eqref{eq:modality_projection}, $h_i^{oct}$, $h_i^{col}$, $h_i^{fus}$, and $h_i^{clin}$ are modality specific hidden representations. The matrices $W_{oct}$, $W_{col}$, $W_{fus}$, and $W_{clin}$ are trainable projections, and $b_{oct}$, $b_{col}$, $b_{fus}$, and $b_{clin}$ are trainable bias vectors.
+
+The fused representation is
+\begin{equation}
+h_i=F_{\theta}\left([h_i^{oct};h_i^{col};h_i^{fus};h_i^{clin}]\right).
+\label{eq:fused_representation}
+\end{equation}
+Here, $F_{\theta}(\cdot)$ is the fusion multilayer perceptron with parameters $\theta$, $[\cdot;\cdot]$ denotes vector concatenation, and $h_i$ is the fused case representation. The modality specific vectors are used for section alignment. The fused vector $h_i$ is used for integrated impression alignment and risk prediction.
+
+\subsection{LCAD Semantic Completion for Missing Reports}
+\label{subsec:lcad_semantic_completion}
+
+LCAD denotes label constrained, auditable, and data grounded semantic completion. In the primary pathway, its role is to create label free structured semantic statements for report missing cases. These statements are used only after audit and only as weak semantic targets.
+
+\subsubsection{Label free evidence summary and statement generation}
+\label{subsubsec:label_free_statement_generation}
+
+Let $\mathcal{R}=\{i:a_i=1\}$ be the set of cases with archived reports and $\mathcal{P}=\{i:a_i=0\}$ be the set of cases without archived reports. For $i\in\mathcal{P}$, a de identified evidence summary is constructed as
+\begin{equation}
+E_i^{safe}=\mathrm{Sanitise}\left(\mathrm{ExtractEvidence}(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin})\right).
+\label{eq:safe_evidence_summary}
+\end{equation}
+In Eq.~\eqref{eq:safe_evidence_summary}, $E_i^{safe}$ is the permitted evidence summary for case $i$. The operator $\mathrm{ExtractEvidence}(\cdot)$ extracts structured descriptors from the four input streams, and $\mathrm{Sanitise}(\cdot)$ removes prohibited information. The summary excludes endpoint labels, pathology derived outcomes, split identity, centre identity, raw images, image paths, patient identifiers, and direct identifiers.
+
+The structured statement object is generated by
+\begin{equation}
+C_i=f_{\psi}(E_i^{safe},P,\mathcal{S}).
+\label{eq:structured_statement_generation}
+\end{equation}
+In Eq.~\eqref{eq:structured_statement_generation}, $C_i$ is the generated structured statement object, $f_{\psi}$ denotes the external LLM API based statement construction function with provider parameters $\psi$, $P$ is the fixed label free prompt, and $\mathcal{S}$ is the strict JSON schema. The prompt does not include $y_i$ or any endpoint derived text.
+
+The generated object is represented as
+\begin{equation}
+C_i=\{C_i^{oct},C_i^{col},C_i^{clin},C_i^{imp},m_i,z_i,s_i,\pi_i\}.
+\label{eq:structured_statement_object}
+\end{equation}
+In Eq.~\eqref{eq:structured_statement_object}, $C_i^{oct}$, $C_i^{col}$, $C_i^{clin}$, and $C_i^{imp}$ are the OCT, colposcopy, clinical context, and integrated impression statement groups. The variable $m_i$ records missing or uncertain evidence, $z_i$ records severe contradiction or unsupported statement flags, $s_i\in[0,1]$ is the support score, and $\pi_i$ records privacy and label use flags.
+
+\subsubsection{Audit gate and semantic supervision weight}
+\label{subsubsec:audit_gate_semantic_weight}
+
+A generated statement is admitted only when it passes the audit gate:
+\begin{equation}
+A(C_i)=1
+\Longleftrightarrow
+\begin{cases}
+\mathrm{schema\_valid}(C_i)=1,\\
+\mathrm{endpoint\_term\_violation}(C_i)=0,\\
+\mathrm{uses\_label}(C_i)=0,\\
+\mathrm{privacy\_flag}(C_i)=0.
+\end{cases}
+\label{eq:audit_gate}
+\end{equation}
+In Eq.~\eqref{eq:audit_gate}, $A(C_i)$ is the binary audit indicator. The functions $\mathrm{schema\_valid}(\cdot)$, $\mathrm{endpoint\_term\_violation}(\cdot)$, $\mathrm{uses\_label}(\cdot)$, and $\mathrm{privacy\_flag}(\cdot)$ check schema validity, endpoint term leakage, label use, and privacy risk. A value of one for $A(C_i)$ means that all required audit checks are satisfied.
+
+The semantic supervision weight is
+\begin{equation}
+\omega_i
+=
+a_i+(1-a_i)s_i\mathbb{I}\{A(C_i)=1\}\mathbb{I}(z_i=0).
+\label{eq:semantic_supervision_weight}
+\end{equation}
+In Eq.~\eqref{eq:semantic_supervision_weight}, $\omega_i$ is the effective weight assigned to the semantic target of case $i$, $a_i$ is the archived report availability indicator, $s_i$ is the support score from Eq.~\eqref{eq:structured_statement_object}, and $z_i=0$ indicates that no severe contradiction or unsupported statement flag is present. Archived reports receive unit weight because $a_i=1$. Generated statements contribute only when they pass audit and have no severe contradiction flag.
+
+\subsubsection{Unified semantic target interface}
+\label{subsubsec:semantic_target_interface}
+
+Archived reports and accepted generated statements are converted into the same section interface before RASA training. For any case with $\omega_i>0$, the semantic target is partitioned as
+\begin{equation}
+r_i^{\star}=\{r_i^{oct},r_i^{col},r_i^{clin},r_i^{imp}\}.
+\label{eq:sectioned_semantic_target}
+\end{equation}
+In Eq.~\eqref{eq:sectioned_semantic_target}, $r_i^{oct}$, $r_i^{col}$, $r_i^{clin}$, and $r_i^{imp}$ are the OCT findings, colposcopy findings, clinical context, and integrated impression sections. The provenance and weight of the target are preserved through $a_i$ and $\omega_i$. This interface allows the downstream model to use real and generated semantic targets without treating them as equivalent sources of clinical truth.
+
+\subsection{RASA Report Anchored Section Alignment}
+\label{subsec:rasa_section_alignment}
+
+RASA denotes report anchored section alignment. It is the representation learning module of MOSAIC. RASA receives the fused multimodal representation from Eq.~\eqref{eq:fused_representation} and the admitted semantic targets from Eq.~\eqref{eq:sectioned_semantic_target}. It then learns a backbone risk classifier while aligning modality specific representations with their corresponding report sections.
+
+\subsubsection{Semantic target conditioned encoding}
+\label{subsubsec:semantic_target_conditioned_encoding}
+
+Let $t_i=(t_{i,1},\ldots,t_{i,L})$ be the token sequence of $r_i^{\star}$ for a case in $\mathcal{D}_{tr}^{sem}$. The symbol $L$ is the maximum sequence length, and $t_{i,l}$ is the token at position $l$. The modality conditioned token embedding is
+\begin{equation}
+\bar{e}_{i,l}=E(t_{i,l})+W_hh_i.
+\label{eq:conditioned_token_embedding}
+\end{equation}
+In Eq.~\eqref{eq:conditioned_token_embedding}, $E(\cdot)$ is the token embedding function, $W_h$ maps the fused representation $h_i$ to the token embedding dimension, and $\bar{e}_{i,l}$ is the conditioned embedding of token $t_{i,l}$.
+
+The contextual semantic hidden sequence is computed as
+\begin{equation}
+H_i=\mathrm{Transformer}_{\phi}(\bar{e}_{i,1},\ldots,\bar{e}_{i,L}).
+\label{eq:semantic_hidden_sequence}
+\end{equation}
+In Eq.~\eqref{eq:semantic_hidden_sequence}, $H_i=(H_{i,1},\ldots,H_{i,L})$ is the hidden sequence for the semantic target, and $\phi$ denotes the transformer parameters. Token level reconstruction logits are obtained by
+\begin{equation}
+\hat{T}_{i,l}=W_{dec}H_{i,l}+b_{dec}.
+\label{eq:token_reconstruction_logits}
+\end{equation}
+Here, $\hat{T}_{i,l}$ is the predicted vocabulary logit vector at position $l$, $H_{i,l}$ is the transformer hidden state at that position, and $W_{dec}$ and $b_{dec}$ are decoder parameters.
+
+The RASA backbone risk score is predicted from the fused representation:
+\begin{equation}
+\hat{p}_i^{RASA}=\sigma(W_{risk}h_i+b_{risk}).
+\label{eq:rasa_risk_score}
+\end{equation}
+In Eq.~\eqref{eq:rasa_risk_score}, $\hat{p}_i^{RASA}$ is the backbone probability that case $i$ is high risk, $W_{risk}$ and $b_{risk}$ are risk head parameters, and $\sigma(\cdot)$ is the sigmoid function.
+
+\subsubsection{Section level semantic anchors}
+\label{subsubsec:section_level_semantic_anchors}
+
+The semantic hidden sequence is pooled into section proxies:
+\begin{equation}
+g_i^k=\mathrm{Pool}_{k}(H_i),
+\qquad
+k\in\mathcal{K}=\{oct,col,clin,imp\}.
+\label{eq:section_proxy_pooling}
+\end{equation}
+In Eq.~\eqref{eq:section_proxy_pooling}, $g_i^k$ is the semantic proxy for section $k$, $\mathrm{Pool}_{k}(\cdot)$ pools the hidden states assigned to section $k$, and $\mathcal{K}$ is the set of section types. The elements $oct$, $col$, $clin$, and $imp$ denote OCT findings, colposcopy findings, clinical context, and integrated impression.
+
+The corresponding projected modality representations are
+\begin{equation}
+\begin{aligned}
+a_i^{oct}&=A_{oct}(h_i^{oct}), &
+a_i^{col}&=A_{col}(h_i^{col}),\\
+a_i^{clin}&=A_{clin}(h_i^{clin}), &
+a_i^{imp}&=A_{imp}(h_i).
+\end{aligned}
+\label{eq:section_projection_heads}
+\end{equation}
+In Eq.~\eqref{eq:section_projection_heads}, $a_i^{oct}$, $a_i^{col}$, $a_i^{clin}$, and $a_i^{imp}$ are projected representations for the four sections. The functions $A_{oct}$, $A_{col}$, $A_{clin}$, and $A_{imp}$ are trainable section projection heads. OCT, colposcopy, and clinical context sections are aligned with their modality specific representations. The integrated impression section is aligned with the fused representation.
+
+For compact notation, let $a_i^k$ denote the projected representation corresponding to section $k$. The alignment loss is
+\begin{equation}
+\mathcal{L}_{align}
+=
+\frac{1}{|\mathcal{C}_{sem}||\mathcal{K}|}
+\sum_{i\in\mathcal{C}_{sem}}
+\omega_i
+\sum_{k\in\mathcal{K}}
+\left[1-\cos(a_i^k,g_i^k)\right].
+\label{eq:section_alignment_loss}
+\end{equation}
+In Eq.~\eqref{eq:section_alignment_loss}, $\mathcal{L}_{align}$ is the section alignment loss, $\mathcal{C}_{sem}$ is a semantic supervision mini batch from $\mathcal{D}_{tr}^{sem}$, $|\mathcal{K}|$ is the number of section types, $\omega_i$ is the semantic supervision weight, and $\cos(\cdot,\cdot)$ denotes cosine similarity. This loss encourages each modality representation to remain consistent with its matched report section.
+
+\subsubsection{Joint training objective}
+\label{subsubsec:joint_training_objective}
+
+The semantic reconstruction loss is
+\begin{equation}
+\mathcal{L}_{rep}
+=
+-\frac{1}{|\mathcal{C}_{sem}|}
+\sum_{i\in\mathcal{C}_{sem}}
+\omega_i
+\frac{1}{L}
+\sum_{l=1}^{L}
+\log P_{\theta}(t_{i,l}\mid t_{i,<l},x_i).
+\label{eq:semantic_reconstruction_loss}
+\end{equation}
+In Eq.~\eqref{eq:semantic_reconstruction_loss}, $\mathcal{L}_{rep}$ is the semantic reconstruction loss, $P_{\theta}(t_{i,l}\mid t_{i,<l},x_i)$ is the probability of token $t_{i,l}$ conditioned on the previous tokens $t_{i,<l}$ and multimodal evidence $x_i$, and $\theta$ denotes trainable model parameters used by the decoder and fusion modules.
+
+The RASA classification loss is
+\begin{equation}
+\mathcal{L}_{risk}^{RASA}
+=
+-\frac{1}{|\mathcal{C}_{risk}|}
+\sum_{i\in\mathcal{C}_{risk}}
+\left[y_i\log\hat{p}_i^{RASA}+(1-y_i)\log(1-\hat{p}_i^{RASA})\right].
+\label{eq:rasa_risk_loss}
+\end{equation}
+Here, $\mathcal{L}_{risk}^{RASA}$ is the binary cross entropy loss for the RASA backbone, $\mathcal{C}_{risk}$ is the supervised risk mini batch, $y_i$ is the locked binary label, and $\hat{p}_i^{RASA}$ is the probability from Eq.~\eqref{eq:rasa_risk_score}.
+
+The complete training objective is
+\begin{equation}
+\mathcal{L}_{MOSAIC}
+=
+\lambda_{risk}\mathcal{L}_{risk}^{RASA}
++
+\lambda_{rep}\mathcal{L}_{rep}
++
+\lambda_{align}\mathcal{L}_{align}.
+\label{eq:mosaic_training_objective}
+\end{equation}
+In Eq.~\eqref{eq:mosaic_training_objective}, $\mathcal{L}_{MOSAIC}$ is the optimisation objective, and $\lambda_{risk}$, $\lambda_{rep}$, and $\lambda_{align}$ are non negative coefficients for risk classification, semantic reconstruction, and section alignment. This objective keeps the supervised endpoint and the weak semantic targets separate. The disease label supervises classification, whereas report sections regularise the representation.
+
+\subsection{Train Only Semantic Retrieval and Final MOSAIC Classifier}
+\label{subsec:train_only_retrieval_final_classifier}
+
+The final stage augments the RASA backbone with a semantic prior derived only from the training split. This design tests whether the learned report anchored semantic space contributes additional risk information without using validation or test labels in the bank.
+
+\subsubsection{Semantic memory bank construction}
+\label{subsubsec:semantic_memory_bank_construction}
+
+The semantic bank is constructed from admitted training semantic targets:
+\begin{equation}
+\mathcal{B}_{tr}
+=
+\{(b_{j,k}^{sem},\ell_j^{risk},k,m_{j,k},q_{j,k}):j\in\mathcal{D}_{tr}^{sem},\ k\in\mathcal{K}\}.
+\label{eq:train_only_semantic_bank}
+\end{equation}
+In Eq.~\eqref{eq:train_only_semantic_bank}, $\mathcal{B}_{tr}$ is the train only semantic bank, $j$ indexes a training case admitted to $\mathcal{D}_{tr}^{sem}$, and $k$ indexes a section type in $\mathcal{K}$. The vector $b_{j,k}^{sem}$ is the endpoint redacted embedding of section $k$ from training case $j$, $\ell_j^{risk}=y_j$ is the locked training label attached only for post retrieval prior estimation, $m_{j,k}$ denotes endpoint redacted modality metadata, and $q_{j,k}$ records provenance and quality metadata.
+
+The bank embedding is computed as
+\begin{equation}
+b_{j,k}^{sem}=E_{bank}(\mathrm{Redact}(r_{j,k}^{\star}),k,m_{j,k}).
+\label{eq:bank_embedding}
+\end{equation}
+In Eq.~\eqref{eq:bank_embedding}, $E_{bank}(\cdot)$ is the section encoder, $r_{j,k}^{\star}$ is section $k$ of the semantic target for training case $j$, and $\mathrm{Redact}(\cdot)$ removes endpoint like terms before embedding. Labels are attached after semantic embeddings are built. They are not used to compute similarity.
+
+\subsubsection{Query representation and retrieval prior}
+\label{subsubsec:query_retrieval_prior}
+
+For a validation or test case, the query representation is generated without using its label. If query side structured statements are used, they are produced from the same de identified evidence summary and audited by the same verifier:
+\begin{equation}
+C_i^{query}=f_{\psi}(E_i^{safe},P,\mathcal{S}),
+\qquad
+\nu_i^k=E_{query}(C_{i,k}^{query}).
+\label{eq:query_statement_embedding}
+\end{equation}
+In Eq.~\eqref{eq:query_statement_embedding}, $C_i^{query}$ is the label free query statement object, $C_{i,k}^{query}$ is its section $k$, $E_{query}(\cdot)$ is the query encoder, and $\nu_i^k$ is the section specific query embedding. Query cases are never inserted into $\mathcal{B}_{tr}$.
+
+Retrieval weights are computed from semantic similarity:
+\begin{equation}
+\rho_{ij}^{k}
+=
+\frac{\exp(\mathrm{sim}(\nu_i^k,b_{j,k}^{sem})/\gamma)}
+{\sum_{(j',k')\in\mathrm{TopK}(i)}\exp(\mathrm{sim}(\nu_i^{k'},b_{j',k'}^{sem})/\gamma)}.
+\label{eq:retrieval_weight}
+\end{equation}
+In Eq.~\eqref{eq:retrieval_weight}, $\rho_{ij}^{k}$ is the normalised weight assigned to section $k$ of training case $j$, $\mathrm{sim}(\cdot,\cdot)$ denotes semantic similarity, $\gamma$ is the retrieval temperature, and $\mathrm{TopK}(i)$ is the retrieved section set from $\mathcal{B}_{tr}$ for query case $i$. The indices $j'$ and $k'$ enumerate the retrieved training cases and section types in the denominator.
+
+The retrieval prior is
+\begin{equation}
+s_i^{ret}
+=
+\sum_{(j,k)\in\mathrm{TopK}(i)}
+\rho_{ij}^{k}\ell_j^{risk}.
+\label{eq:semantic_retrieval_prior}
+\end{equation}
+In Eq.~\eqref{eq:semantic_retrieval_prior}, $s_i^{ret}$ is the retrieval derived risk prior for query case $i$, $\rho_{ij}^{k}$ is the semantic retrieval weight from Eq.~\eqref{eq:retrieval_weight}, and $\ell_j^{risk}$ is the training label attached to retrieved case $j$ after semantic retrieval. If several sections from the same training case are retrieved, section weights are normalised during aggregation to avoid a section count bias.
+
+\subsubsection{Validation calibrated logit fusion}
+\label{subsubsec:validation_calibrated_logit_fusion}
+
+The retrieval prior is clipped before logit transformation:
+\begin{equation}
+\tilde{s}_i^{ret}=\mathrm{clip}(s_i^{ret},\epsilon,1-\epsilon).
+\label{eq:clipped_retrieval_prior}
+\end{equation}
+In Eq.~\eqref{eq:clipped_retrieval_prior}, $\tilde{s}_i^{ret}$ is the clipped retrieval prior, $s_i^{ret}$ is the unclipped prior from Eq.~\eqref{eq:semantic_retrieval_prior}, and $\epsilon$ is a small positive constant used for numerical stability.
+
+The final MOSAIC probability is
+\begin{equation}
+\hat{p}_i^{MOSAIC}
+=
+\sigma\left[(1-\alpha^{\star})\operatorname{logit}(\hat{p}_i^{RASA})
++\alpha^{\star}\operatorname{logit}(\tilde{s}_i^{ret})\right].
+\label{eq:final_mosaic_classifier}
+\end{equation}
+In Eq.~\eqref{eq:final_mosaic_classifier}, $\hat{p}_i^{MOSAIC}$ is the final MOSAIC risk probability, $\operatorname{logit}(\cdot)$ maps a probability to log odds, and $\sigma(\cdot)$ maps the fused log odds back to a probability. The coefficient $\alpha^{\star}$ is selected on the validation split and then locked before test evaluation.
+
+The final binary decision is
+\begin{equation}
+\hat{y}_i^{MOSAIC}=\mathbb{I}(\hat{p}_i^{MOSAIC}\geq\tau^{\star}).
+\label{eq:final_mosaic_binary_decision}
+\end{equation}
+In Eq.~\eqref{eq:final_mosaic_binary_decision}, $\hat{y}_i^{MOSAIC}$ is the final predicted class, and $\tau^{\star}$ is the validation selected operating threshold. Equations~\eqref{eq:final_mosaic_classifier} and~\eqref{eq:final_mosaic_binary_decision} are the final classification output of the full MOSAIC model.
+
+\subsubsection{Control banks and interpretation scope}
+\label{subsubsec:control_banks_interpretation_scope}
+
+Control banks are used to delimit the interpretation of retrieval based gains. The primary bank uses archived reports and accepted LLM API generated statements. A rule fallback bank uses deterministic label free rules. A random label bank preserves the retrieval graph but permutes training labels before computing $s_i^{ret}$. A non report visual clinical bank removes report text, generated statement text, impression text, and semantic tags. A label constrained upper bound bank is used only as an ablation to estimate the effect of allowing training labels during generation. It is not part of the primary MOSAIC pathway.
+
+A downstream contribution from LLM API generated statements is interpreted only when the primary semantic bank improves over the RASA backbone and relevant negative controls. If the semantic bank is leakage safe but does not outperform strong controls, the result is interpreted as feasibility and leakage control evidence rather than as proven downstream improvement.
+
+\subsection{Methodological Summary}
+\label{subsec:methodological_summary}
+
+MOSAIC is a binary risk classification framework with weak report level semantic supervision. The final supervised endpoint is the locked binary label $y_i$. The final prediction is $\hat{p}_i^{MOSAIC}$, and the final decision is $\hat{y}_i^{MOSAIC}$. LCAD supplies audited label free semantic targets for cases without archived reports. RASA aligns modality specific representations with OCT, colposcopy, clinical context, and integrated impression sections while learning the backbone classifier. Train only retrieval converts the learned semantic space into a local risk prior and combines it with the RASA score through validation calibrated logit fusion. Under this formulation, classification is the final problem, and semantic completion, section alignment, and retrieval are auxiliary mechanisms designed to support classification under incomplete report supervision.
