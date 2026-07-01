@@ -1,0 +1,556 @@
+\section{Method}
+\label{sec:methods}
+
+MOSAIC addresses case-level cervical disease risk stratification when multimodal evidence is available at scale but report-level semantic supervision is incomplete. The central design principle is to use language models and vision-language models only as bounded sources of semantic structure, not as endpoint-label oracles. The final output of MOSAIC is a case-level risk probability. Report text, generated statements, retrieved sections, semantic positives, and foundation-model teachers are used only to shape, audit, or calibrate the representation under explicit split and leakage controls.
+
+The method has six components. Section~\ref{subsec:problem_overview_final_topcs} formalises weak report supervision and the leakage boundary. Section~\ref{subsec:evidence_encoding_final_topcs} defines the multimodal evidence interface. Section~\ref{subsec:lcad_final_topcs} introduces LCAD, a label-constrained, auditable, and data-grounded report-completion module. Section~\ref{subsec:rasa_final_topcs} defines RASA, the report-anchored section-alignment backbone with bidirectional contrastive modality-section grounding. Section~\ref{subsec:retrieval_qpsc_vse_final_topcs} describes train-only semantic retrieval, QC-gated semantic-positive construction, and gated medical vision-language teacher auditing. Section~\ref{subsec:optimization_workflow_final_topcs} gives the training objective and algorithmic workflow.
+
+\subsection{Problem Formulation and Supervision Boundary}
+\label{subsec:problem_overview_final_topcs}
+
+Let the retrospective cohort be
+\begin{equation}
+\mathcal{D}=
+\{(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin},y_i,c_i,a_i,r_i^{arc})\}_{i=1}^{N},
+\label{eq:mosaic_dataset_final_topcs}
+\end{equation}
+where $i$ indexes a case. The variables $x_i^{oct}$, $x_i^{col}$, $x_i^{fus}$, and $x_i^{clin}$ denote OCT evidence, colposcopy evidence, fused visual evidence, and structured clinical evidence. The locked endpoint label is $y_i\in\{0,1\}$. The center identifier is $c_i$. The report-availability indicator is $a_i=\mathbb{I}(r_i^{arc}\ \mathrm{available})$, where $r_i^{arc}$ is an archived clinician-authored report. Center identifiers are used for stratification and missingness audit, but not as predictive input features.
+
+The difficulty is that $r_i^{arc}$ is observed only for a subset of cases. MOSAIC therefore defines an admitted weak report target
+\begin{equation}
+r_i^{\star}
+=
+\begin{cases}
+r_i^{arc}, & a_i=1,\\
+\mathrm{Flatten}(C_i), & a_i=0\ \mathrm{and}\ \omega_i>0,\\
+\varnothing, & a_i=0\ \mathrm{and}\ \omega_i=0,
+\end{cases}
+\label{eq:mosaic_report_target_final_topcs}
+\end{equation}
+where $C_i$ is the audited structured statement object produced by LCAD, $\omega_i$ is the audit-derived case-level supervision weight, and $\varnothing$ denotes that no report target is admitted. Archived reports provide full report supervision. LLM-completed targets are admitted only after audit and are weighted by their reliability.
+
+The report-supervised training subset is
+\begin{equation}
+\mathcal{D}_{tr}^{rep}
+=
+\{(i,r_i^{\star},\omega_i,\{\omega_i^k\}_{k\in\mathcal{K}}):
+i\in\mathcal{D}_{tr},\ \omega_i>0\},
+\label{eq:mosaic_report_training_set_final_topcs}
+\end{equation}
+where $\mathcal{D}_{tr}$ is the training split and $\mathcal{K}=\{oct,col,clin,imp\}$ denotes OCT findings, colposcopy findings, clinical context, and integrated impression. Cases with no admitted report target may still contribute to the endpoint risk loss if $y_i$ is available, but they do not contribute to report reconstruction or section-level alignment.
+
+The final predictive task is
+\begin{equation}
+\hat p_i^{MOSAIC}
+=
+F_{\Theta}(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin};\mathcal{B}_{tr}),
+\label{eq:mosaic_prediction_task_final_topcs}
+\end{equation}
+where $\hat p_i^{MOSAIC}\in[0,1]$ is the predicted high-risk probability, $F_{\Theta}$ is the full MOSAIC predictor, and $\mathcal{B}_{tr}$ is a train-only semantic bank. The admitted report target $r_i^{\star}$ is not required at test time. It is used during training and bank construction to provide auditable semantic anchors.
+
+MOSAIC separates three information channels. Report supervision is provided by $r_i^{\star}$ and is used for semantic reconstruction, section alignment, and train-only memory construction. Endpoint supervision is provided by $y_i$ and is used only for the supervised risk loss and validation-calibrated fusion. Report availability is encoded by $a_i$ and used for missingness analysis:
+\begin{equation}
+\pi_c=\Pr(a_i=1\mid c_i=c).
+\label{eq:mosaic_center_report_rate_final_topcs}
+\end{equation}
+The quantity $\pi_c$ measures center-level report availability and is not used as a predictive feature.
+
+All LLM prompts receive only de-identified and endpoint-redacted evidence summaries. The prompt does not include endpoint labels, CIN2+ labels, CIN3+ labels, histopathology, pathology-derived outcomes, split labels, raw images, image paths, patient identifiers, hospital identifiers, or center identifiers. This boundary is enforced before report completion, section alignment, semantic-positive construction, and retrieval grounding.
+
+\subsection{Multimodal Evidence Encoding}
+\label{subsec:evidence_encoding_final_topcs}
+
+MOSAIC uses a modality-preserving encoder so that each report section can be aligned with the evidence stream that supports it most directly. For case $i$, pretrained or fixed evidence extractors produce case-level vectors $v_i^{oct}$, $v_i^{col}$, and $v_i^{fus}$ for OCT, colposcopy, and fused visual evidence. Multiple images from the same case are aggregated by a deterministic pooling rule fixed before model training. Structured clinical variables are encoded as $u_i\in\mathbb{R}^{d_{clin}}$. The clinical vector excludes report text, generated statements, center identifiers, pathology-like variables, and endpoint labels.
+
+Each evidence stream is projected into a shared hidden space:
+\begin{equation}
+\begin{aligned}
+h_i^{oct} &= W_{oct}v_i^{oct}+b_{oct},&
+h_i^{col} &= W_{col}v_i^{col}+b_{col},\\
+h_i^{fus} &= W_{fus}v_i^{fus}+b_{fus},&
+h_i^{clin} &= W_{clin}u_i+b_{clin}.
+\end{aligned}
+\label{eq:mosaic_modality_projection_final_topcs}
+\end{equation}
+The modality-specific vectors are retained for section-wise alignment. A case-level representation is then obtained by fusion:
+\begin{equation}
+h_i=
+F_{\theta}([h_i^{oct};h_i^{col};h_i^{fus};h_i^{clin}]),
+\label{eq:mosaic_fused_representation_final_topcs}
+\end{equation}
+where $[\cdot;\cdot]$ denotes concatenation and $F_{\theta}$ is the multimodal fusion network. The fused representation $h_i$ is used for risk prediction, train-only retrieval queries, and integrated-impression alignment.
+
+\subsection{LCAD: Label-Constrained, Auditable, and Data-Grounded Completion}
+\label{subsec:lcad_final_topcs}
+
+LCAD converts missing report supervision into weak, auditable, section-level semantic targets. It uses an external LLM API as a constrained structured-completion engine. It does not assign endpoint labels, does not overwrite archived clinician-authored reports, and does not treat generated text as clinical ground truth.
+
+\subsubsection{Label-free structured completion}
+\label{subsubsec:lcad_generation_final_topcs}
+
+For a report-missing case, LCAD first builds a safe evidence summary:
+\begin{equation}
+E_i^{safe}
+=
+\mathrm{Sanitise}(\mathrm{Extract}(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin})),
+\label{eq:mosaic_safe_evidence_final_topcs}
+\end{equation}
+where $\mathrm{Extract}(\cdot)$ converts permitted multimodal evidence into a text-compatible summary and $\mathrm{Sanitise}(\cdot)$ removes identifiers and endpoint-derived information. The structured completion step is
+\begin{equation}
+C_i=f_{\psi}(E_i^{safe},P,\mathcal{S}),
+\label{eq:mosaic_llm_completion_final_topcs}
+\end{equation}
+where $f_{\psi}$ is the external LLM API, $P$ is a fixed label-free prompt, $\mathcal{S}$ is a strict JSON schema, and $C_i$ is the generated statement object. The prompt asks the LLM to organise permitted evidence into sectioned clinical statements, not to infer a diagnosis or risk label.
+
+The generated object is decomposed as
+\begin{equation}
+C_i=\{C_i^k:k\in\mathcal{K}\},
+\qquad
+C_i^k=\{c_{i,k,m}\}_{m=1}^{M_{i,k}},
+\label{eq:mosaic_claim_object_final_topcs}
+\end{equation}
+where $C_i^k$ is the set of generated claims in section $k$, $c_{i,k,m}$ is a single claim, and $M_{i,k}$ is the number of claims in that section. Claim-level decomposition lets LCAD keep supported statements and remove unsupported or prohibited statements without accepting or rejecting the entire report as one unit.
+
+\subsubsection{Claim admission and reliability weighting}
+\label{subsubsec:claim_audit_final_topcs}
+
+Each generated claim passes through an audit gate:
+\begin{equation}
+A(c_{i,k,m})=1
+\Longleftrightarrow
+\begin{cases}
+\mathrm{schema\_valid}(c_{i,k,m})=1,\\
+\mathrm{endpoint\_term\_violation}(c_{i,k,m})=0,\\
+\mathrm{uses\_label\_in\_generation}(c_{i,k,m})=0,\\
+\mathrm{privacy\_flag}(c_{i,k,m})=0,\\
+\mathrm{contradiction\_flag}(c_{i,k,m})=0.
+\end{cases}
+\label{eq:mosaic_claim_audit_gate_final_topcs}
+\end{equation}
+The audit checks schema validity, endpoint-term leakage, label use, privacy risk, and unsupported contradiction. A claim contributes to training only when all checks are satisfied.
+
+An admitted claim receives a reliability weight
+\begin{equation}
+\eta_{i,k,m}
+=
+s_{i,k,m}\mathbb{I}\{A(c_{i,k,m})=1\}(1-u_{i,k,m}),
+\label{eq:mosaic_claim_reliability_final_topcs}
+\end{equation}
+where $s_{i,k,m}\in[0,1]$ is the evidence-support score and $u_{i,k,m}\in[0,1]$ is the uncertainty score. Section-level and case-level supervision weights are
+\begin{equation}
+\omega_i^k=
+\frac{1}{M_{i,k}}\sum_{m=1}^{M_{i,k}}\eta_{i,k,m},
+\qquad
+\omega_i=
+\frac{1}{|\mathcal{K}|}\sum_{k\in\mathcal{K}}\omega_i^k.
+\label{eq:mosaic_section_case_weight_final_topcs}
+\end{equation}
+If all claims fail audit, $\omega_i=0$ and the generated report is excluded from semantic training. For archived reports, $\omega_i$ is set to one.
+
+The admitted weak target is
+\begin{equation}
+r_i^{\star}
+=
+\mathrm{Flatten}
+\left(
+\{c_{i,k,m}:A(c_{i,k,m})=1,\ k\in\mathcal{K},\ 1\leq m\leq M_{i,k}\}
+\right).
+\label{eq:mosaic_admitted_target_final_topcs}
+\end{equation}
+This target is a sectioned semantic supervision signal, not a clinician-authored report.
+
+\begin{table}[!t]
+\centering
+\caption{LCAD input, output, and audit contract.}
+\label{tab:lcad_contract_final_topcs}
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\begin{threeparttable}
+\begin{tabular}{p{3.4cm}p{9.6cm}}
+\toprule
+\rowcolor{gray!15}
+\textbf{Component} & \textbf{Specification} \\
+\midrule
+Permitted input & De-identified evidence summaries derived from OCT descriptors, colposcopy descriptors, fused visual descriptors, and prespecified non-identifying clinical fields. \\
+Prohibited input & Endpoint labels, CIN2+/CIN3+ terms, histopathology, pathology-derived outcomes, split labels, raw images, image paths, patient identifiers, hospital identifiers, and center identifiers. \\
+Output structure & Strict JSON with claim-level sections for OCT findings, colposcopy findings, clinical context, and integrated impression. \\
+Audit items & Schema validity, endpoint-term screening, label-use screening, privacy screening, contradiction checking, evidence-support scoring, and uncertainty scoring. \\
+Training use & Audit-passing claims form weak semantic targets. Failed claims receive zero weight and are excluded from reconstruction, section alignment, semantic-positive construction, and memory construction. \\
+Boundary & LCAD does not replace archived reports, assign endpoint labels, or treat generated text as clinician-authored ground truth. \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]
+\footnotesize
+\item \textit{The contract defines the primary label-free pathway. Label-conditioned completion is not used in MOSAIC.}
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsection{RASA: Report-Anchored Section Alignment}
+\label{subsec:rasa_final_topcs}
+
+RASA uses admitted report sections as semantic anchors for the multimodal representation. Its key constraint is section specificity: OCT findings should align with OCT evidence, colposcopy findings with colposcopy evidence, clinical context with structured clinical variables, and integrated impression with the fused case representation. This converts report supervision from a single sequence-level signal into a set of modality-section alignment constraints.
+
+\subsubsection{Section-conditioned semantic anchors}
+\label{subsubsec:section_decoder_final_topcs}
+
+For a case with admitted target $r_i^{\star}$, let
+\begin{equation}
+t_i=(t_{i,1},t_{i,2},\ldots,t_{i,L_i})
+\label{eq:mosaic_token_sequence_final_topcs}
+\end{equation}
+be the token sequence of the target. Section membership is
+\begin{equation}
+\mathcal{I}_i^k=\{l:t_{i,l}\ \mathrm{belongs\ to\ section}\ k\},
+\qquad k\in\mathcal{K}.
+\label{eq:mosaic_section_token_index_final_topcs}
+\end{equation}
+The reconstruction branch conditions each target token on the fused multimodal representation:
+\begin{equation}
+\bar e_{i,l}=E(t_{i,l})+W_hh_i,
+\label{eq:mosaic_conditioned_embedding_final_topcs}
+\end{equation}
+where $E(\cdot)$ is the token-embedding function. Contextual states are
+\begin{equation}
+H_i=
+\mathrm{Transformer}_{\phi}(\bar e_{i,1},\bar e_{i,2},\ldots,\bar e_{i,L_i}),
+\label{eq:mosaic_semantic_states_final_topcs}
+\end{equation}
+and vocabulary logits are
+\begin{equation}
+\hat T_{i,l}=W_{dec}H_{i,l}+b_{dec}.
+\label{eq:mosaic_token_logits_final_topcs}
+\end{equation}
+The section anchor is obtained by pooling hidden states assigned to that section:
+\begin{equation}
+g_i^k=
+\frac{1}{|\mathcal{I}_i^k|}
+\sum_{l\in\mathcal{I}_i^k}H_{i,l},
+\qquad
+k\in\mathcal{K}.
+\label{eq:mosaic_section_anchor_final_topcs}
+\end{equation}
+Sections with no admitted tokens are excluded from section-level losses.
+
+\subsubsection{Bidirectional modality-section contrastive alignment}
+\label{subsubsec:evidence_section_alignment_final_topcs}
+
+RASA projects the evidence streams into the same section-anchor space:
+\begin{equation}
+\begin{aligned}
+a_i^{oct}&=A_{oct}(h_i^{oct}),&
+a_i^{col}&=A_{col}(h_i^{col}),\\
+a_i^{clin}&=A_{clin}(h_i^{clin}),&
+a_i^{imp}&=A_{imp}(h_i).
+\end{aligned}
+\label{eq:mosaic_section_projection_final_topcs}
+\end{equation}
+The integrated-impression projection uses the fused case representation because the impression section summarises information across modalities.
+
+A weighted cosine alignment term encourages matched evidence and report-section anchors to remain close:
+\begin{equation}
+\mathcal{L}_{align}
+=
+\frac{1}{|\mathcal{C}_{rep}|}
+\sum_{i\in\mathcal{C}_{rep}}
+\sum_{k\in\mathcal{K}_i}
+\omega_i^k
+\left[1-\cos(a_i^k,g_i^k)\right],
+\label{eq:mosaic_alignment_loss_final_topcs}
+\end{equation}
+where $\mathcal{C}_{rep}$ is a report-supervised mini-batch and $\mathcal{K}_i$ contains admitted sections for case $i$.
+
+Cosine alignment alone does not explicitly separate mismatched cases. MOSAIC therefore uses an ORSA-style bidirectional section-wise contrastive objective. For section $k$, the evidence-to-section term is
+\begin{equation}
+\mathcal{L}_{a\rightarrow g}^{k}
+=
+-\frac{1}{|\mathcal{C}_{rep}^{k}|}
+\sum_{i\in\mathcal{C}_{rep}^{k}}
+\log
+\frac{
+\exp(\mathrm{sim}(a_i^k,g_i^k)/\tau_c)
+}{
+\sum_{j\in\mathcal{C}_{rep}^{k}}
+\exp(\mathrm{sim}(a_i^k,g_j^k)/\tau_c)
+},
+\label{eq:mosaic_contrastive_ag_final_topcs}
+\end{equation}
+where $\mathcal{C}_{rep}^{k}$ is the set of mini-batch cases with an admitted section $k$ and $\tau_c$ is the contrastive temperature. The reverse direction is
+\begin{equation}
+\mathcal{L}_{g\rightarrow a}^{k}
+=
+-\frac{1}{|\mathcal{C}_{rep}^{k}|}
+\sum_{i\in\mathcal{C}_{rep}^{k}}
+\log
+\frac{
+\exp(\mathrm{sim}(g_i^k,a_i^k)/\tau_c)
+}{
+\sum_{j\in\mathcal{C}_{rep}^{k}}
+\exp(\mathrm{sim}(g_i^k,a_j^k)/\tau_c)
+}.
+\label{eq:mosaic_contrastive_ga_final_topcs}
+\end{equation}
+The bidirectional contrastive loss is
+\begin{equation}
+\mathcal{L}_{bi}
+=
+\sum_{k\in\mathcal{K}}
+\left(
+\mathcal{L}_{a\rightarrow g}^{k}
++
+\mathcal{L}_{g\rightarrow a}^{k}
+\right).
+\label{eq:mosaic_bidirectional_contrastive_final_topcs}
+\end{equation}
+This objective makes the section space discriminative in both retrieval directions: evidence should retrieve its paired report section, and a report section should retrieve its paired evidence stream.
+
+\subsubsection{Report-target reconstruction}
+\label{subsubsec:generation_loss_final_topcs}
+
+The reconstruction loss is
+\begin{equation}
+\mathcal{L}_{gen}
+=
+-\frac{1}{|\mathcal{C}_{rep}|}
+\sum_{i\in\mathcal{C}_{rep}}
+\omega_i
+\frac{1}{L_i}
+\sum_{l=1}^{L_i}
+\log P_{\Theta}(t_{i,l}\mid t_{i,<l},x_i),
+\label{eq:mosaic_generation_loss_final_topcs}
+\end{equation}
+where $x_i=(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin})$. The reconstruction branch is a training signal for report-aware representation learning. It is not used to produce the final clinical output.
+
+\subsection{Retrieval Grounding, Semantic Positives, and Teacher Audits}
+\label{subsec:retrieval_qpsc_vse_final_topcs}
+
+The preceding modules define the parametric report-anchored backbone. MOSAIC further uses a train-only semantic bank for non-parametric grounding and two audit protocols. The QPSC-style protocol evaluates whether QC-gated semantic positives provide a stronger train-only prior than random, shuffled, or prevalence-only controls. The VSE-style protocol evaluates whether external medical vision-language teachers can improve the learned report-anchored representation. Both protocols are bounded by explicit promotion rules; they do not replace MOSAIC unless they pass prespecified validation and test gates.
+
+\subsubsection{Train-only semantic retrieval}
+\label{subsubsec:retrieval_grounding_final_topcs}
+
+The semantic bank contains only admitted sections from the training split:
+\begin{equation}
+\mathcal{B}_{tr}
+=
+\{(b_{j,k}^{sem},r_{j,k}^{red},k,q_{j,k},y_j):
+j\in\mathcal{D}_{tr}^{rep},\ k\in\mathcal{K}_j\}.
+\label{eq:mosaic_semantic_bank_final_topcs}
+\end{equation}
+Here, $b_{j,k}^{sem}$ is the embedding of the redacted admitted section $r_{j,k}^{red}$, $q_{j,k}$ stores source and audit-quality metadata, and $y_j$ is the training endpoint label. The endpoint label is stored only for estimating a train-derived risk prior after retrieval. It is not used to choose neighbours, construct positives, generate reports, or align sections.
+
+Bank embeddings are computed as
+\begin{equation}
+r_{j,k}^{red}=\mathrm{Redact}(r_{j,k}^{\star}),
+\qquad
+b_{j,k}^{sem}=E_{bank}(r_{j,k}^{red},k,q_{j,k}),
+\label{eq:mosaic_bank_embedding_final_topcs}
+\end{equation}
+where $\mathrm{Redact}(\cdot)$ removes prohibited endpoint-like terms. Validation and test cases are never inserted into $\mathcal{B}_{tr}$.
+
+For query case $i$, section-specific query embeddings are
+\begin{equation}
+\nu_i^k=E_{qry}(h_i,k),
+\qquad k\in\mathcal{K}.
+\label{eq:mosaic_query_embedding_final_topcs}
+\end{equation}
+Retrieval is performed within the same section:
+\begin{equation}
+\rho_{ij}^{k}
+=
+\frac{\exp(\mathrm{sim}(\nu_i^k,b_{j,k}^{sem})/\gamma)}
+{\sum_{j'\in\mathrm{TopK}_{k}(i)}
+\exp(\mathrm{sim}(\nu_i^k,b_{j',k}^{sem})/\gamma)}.
+\label{eq:mosaic_retrieval_weights_final_topcs}
+\end{equation}
+The retrieved grounding context is
+\begin{equation}
+z_i^k
+=
+\sum_{j\in\mathrm{TopK}_{k}(i)}
+\rho_{ij}^{k}b_{j,k}^{sem},
+\qquad
+\mathcal{Z}_i=\{z_i^k:k\in\mathcal{K}\}.
+\label{eq:mosaic_retrieved_context_final_topcs}
+\end{equation}
+
+\subsubsection{QC-gated semantic positive construction}
+\label{subsubsec:qpsc_positive_final_topcs}
+
+MOSAIC uses a QPSC-style audit to test whether reliable semantic positives can improve the report-anchored space without endpoint leakage. For each query case and section, valid positives are selected only from QC-passed training-bank entries:
+\begin{equation}
+\mathcal{P}_{i}^{k}
+=
+\{j:
+j\in\mathrm{TopK}_{k}(i),\
+q_{j,k}\in\mathcal{Q}_{pass},\
+\mathrm{source}(j)\in\{\mathrm{archived},\mathrm{audited\ LCAD}\}\}.
+\label{eq:mosaic_qpsc_positive_set_final_topcs}
+\end{equation}
+The set $\mathcal{Q}_{pass}$ denotes admissible audit-quality states. Selection in Eq.~\eqref{eq:mosaic_qpsc_positive_set_final_topcs} uses semantic similarity, report section, and audit quality only. It does not use the query endpoint label, test labels, endpoint oracle information, or same-label filtering.
+
+The semantic-positive prior is
+\begin{equation}
+s_i^{qpsc}
+=
+\sum_{k\in\mathcal{K}}
+\beta_k
+\sum_{j\in\mathcal{P}_{i}^{k}}
+\rho_{ij}^{k}y_j,
+\qquad
+\sum_{k\in\mathcal{K}}\beta_k=1,
+\label{eq:mosaic_qpsc_prior_final_topcs}
+\end{equation}
+where $\beta_k$ are section weights fixed or selected on validation data. Training labels $y_j$ are used only after label-free neighbour selection to estimate a train-derived prior. This design keeps positive construction label-free for query, validation, and test cases.
+
+The QPSC audit includes negative and leakage controls:
+\begin{equation}
+\mathcal{A}_{QPSC}
+=
+\{\mathrm{QC\mbox{-}gated},\mathrm{uncurated},\mathrm{random},
+\mathrm{shuffled\mbox{-}label},\mathrm{label\mbox{-}prior},
+\mathrm{oracle\ stress}\}.
+\label{eq:mosaic_qpsc_controls_final_topcs}
+\end{equation}
+The oracle stress setting is intentionally invalid for main claims because it uses query or test endpoint information to construct positives. It is retained only as a leakage-boundary diagnostic.
+
+\subsubsection{Medical VLP teacher audit with promotion gate}
+\label{subsubsec:vse_teacher_final_topcs}
+
+MOSAIC also evaluates whether external medical vision-language priors add useful semantic information beyond the report-anchored space. Let $t_i^{(m)}\in[0,1]$ denote the score from teacher $m$, such as a CLIP-Report, BiomedCLIP, or UniMedCLIP baseline. A validation-calibrated teacher audit score is
+\begin{equation}
+\hat p_i^{teacher(m)}
+=
+\sigma\left[
+(1-\delta_m^{\star})\operatorname{logit}(\hat p_i^{base})
++
+\delta_m^{\star}\operatorname{logit}(t_i^{(m)})
+\right],
+\label{eq:mosaic_teacher_fusion_final_topcs}
+\end{equation}
+where $\hat p_i^{base}$ is either the RASA backbone score or the full MOSAIC score, and $\delta_m^{\star}$ is selected on the validation split. Teacher scores are used as an audit of semantic compatibility. They are not used to generate report targets or construct the train-only semantic bank.
+
+A teacher audit is promoted only if it satisfies the prespecified gate
+\begin{equation}
+\mathrm{Promote}(m)=1
+\Longleftrightarrow
+\begin{cases}
+\mathrm{AUROC}(\hat p^{teacher(m)})>\max(\mathrm{AUROC}_{RASA},\mathrm{AUROC}_{MOSAIC}),\\
+\mathrm{F1}(\hat p^{teacher(m)})>\max(\mathrm{F1}_{RASA},\mathrm{F1}_{MOSAIC}).
+\end{cases}
+\label{eq:mosaic_teacher_promotion_gate_final_topcs}
+\end{equation}
+If this gate is not met, the teacher remains an auxiliary audit and the primary method remains MOSAIC. This rule prevents external VLP baselines from redefining the contribution unless they provide consistent utility beyond the locked report-anchored pipeline.
+
+\subsubsection{Risk prediction and calibrated fusion}
+\label{subsubsec:risk_prediction_final_topcs}
+
+The RASA backbone predicts
+\begin{equation}
+\hat p_i^{RASA}
+=
+\sigma(W_yh_i+b_y).
+\label{eq:mosaic_rasa_probability_final_topcs}
+\end{equation}
+The train-only retrieval prior is
+\begin{equation}
+s_i^{ret}=R_{\xi}(h_i,\mathcal{Z}_i),
+\label{eq:mosaic_retrieval_prior_final_topcs}
+\end{equation}
+where $R_{\xi}$ is a retrieval scoring function. The final MOSAIC score is obtained by validation-calibrated logit fusion:
+\begin{equation}
+\hat p_i^{MOSAIC}
+=
+\sigma\left[
+(1-\alpha^{\star})\operatorname{logit}(\hat p_i^{RASA})
++
+\alpha^{\star}\operatorname{logit}(s_i^{ret})
+\right],
+\label{eq:mosaic_logit_fusion_final_topcs}
+\end{equation}
+where $\alpha^{\star}$ is selected on the validation split and fixed before test evaluation.
+
+\subsection{Optimization and Algorithmic Workflow}
+\label{subsec:optimization_workflow_final_topcs}
+
+The supervised risk loss is
+\begin{equation}
+\mathcal{L}_{risk}
+=
+-\frac{1}{|\mathcal{C}_{cls}|}
+\sum_{i\in\mathcal{C}_{cls}}
+\left[
+y_i\log\hat p_i^{RASA}
++
+(1-y_i)\log(1-\hat p_i^{RASA})
+\right],
+\label{eq:mosaic_risk_loss_final_topcs}
+\end{equation}
+where $\mathcal{C}_{cls}$ is a mini-batch with locked endpoint labels. Endpoint labels are not supplied to LCAD, semantic section generation, alignment-pair construction, or retrieval-neighbour selection.
+
+The primary MOSAIC objective is
+\begin{equation}
+\mathcal{L}_{MOSAIC}
+=
+\lambda_{risk}\mathcal{L}_{risk}
++
+\lambda_{gen}\mathcal{L}_{gen}
++
+\lambda_{align}\mathcal{L}_{align}
++
+\lambda_{bi}\mathcal{L}_{bi}.
+\label{eq:mosaic_overall_objective_final_topcs}
+\end{equation}
+The coefficients $\lambda_{risk}$, $\lambda_{gen}$, $\lambda_{align}$, and $\lambda_{bi}$ are non-negative weights. QPSC and VLP teacher modules are evaluated through validation-calibrated audit protocols. They are not allowed to alter the primary claim unless their prespecified gates are satisfied.
+
+\begin{algorithm}[!t]
+\scriptsize
+\caption{MOSAIC training, retrieval, and gated semantic audits}
+\label{alg:mosaic_workflow_final_topcs}
+\begin{algorithmic}[1]
+\State \textbf{Input:} training split $\mathcal{D}_{tr}$, validation split $\mathcal{D}_{val}$, query split $\mathcal{D}_{q}$, sections $\mathcal{K}=\{oct,col,clin,imp\}$
+\State \textbf{Fixed resources:} label-free prompt $P$, schema $\mathcal{S}$, audit rules, redaction rules, QC rules, teacher baselines
+\State Initialise admitted report set $\mathcal{D}_{tr}^{rep}\leftarrow\emptyset$ and train-only bank $\mathcal{B}_{tr}\leftarrow\emptyset$
+\For{case $i\in\mathcal{D}_{tr}$}
+    \If{archived report $r_i^{arc}$ is available}
+        \State $r_i^{\star}\leftarrow r_i^{arc}$ and $\omega_i\leftarrow 1$
+    \Else
+        \State $E_i^{safe}\leftarrow\mathrm{Sanitise}(\mathrm{Extract}(x_i^{oct},x_i^{col},x_i^{fus},x_i^{clin}))$
+        \State $C_i\leftarrow f_{\psi}(E_i^{safe},P,\mathcal{S})$
+        \For{claim $c_{i,k,m}\in C_i^k$, $k\in\mathcal{K}$}
+            \State compute $A(c_{i,k,m})$ and $\eta_{i,k,m}$
+        \EndFor
+        \State compute $\omega_i^k$, $\omega_i$, and $r_i^{\star}$ from admitted claims
+    \EndIf
+    \If{$\omega_i>0$}
+        \State add $(i,r_i^{\star},\omega_i,\{\omega_i^k\}_{k\in\mathcal{K}})$ to $\mathcal{D}_{tr}^{rep}$
+    \EndIf
+\EndFor
+\For{mini-batches $\mathcal{C}_{rep}\subset\mathcal{D}_{tr}^{rep}$ and $\mathcal{C}_{cls}\subset\mathcal{D}_{tr}$}
+    \State encode $h_i^{oct}$, $h_i^{col}$, $h_i^{fus}$, $h_i^{clin}$, and $h_i$
+    \State compute section anchors $g_i^k$ and evidence projections $a_i^k$
+    \State optimise $\mathcal{L}_{MOSAIC}$ from Eq.~\eqref{eq:mosaic_overall_objective_final_topcs}
+\EndFor
+\For{admitted training section $r_{j,k}^{\star}$}
+    \State $r_{j,k}^{red}\leftarrow\mathrm{Redact}(r_{j,k}^{\star})$
+    \State add $(E_{bank}(r_{j,k}^{red},k,q_{j,k}),r_{j,k}^{red},k,q_{j,k},y_j)$ to $\mathcal{B}_{tr}$
+\EndFor
+\State select $\alpha^{\star}$ for MOSAIC retrieval fusion on $\mathcal{D}_{val}$
+\For{query case $i\in\mathcal{D}_{q}$}
+    \State encode multimodal representation $h_i$
+    \State compute $\hat p_i^{RASA}$ and retrieve section contexts $\mathcal{Z}_i$ from $\mathcal{B}_{tr}$
+    \State compute $\hat p_i^{MOSAIC}$ using Eq.~\eqref{eq:mosaic_logit_fusion_final_topcs}
+\EndFor
+\For{QPSC audit setting $a\in\mathcal{A}_{QPSC}$}
+    \State construct semantic positives or controls from the training bank according to setting $a$
+    \State mark oracle stress as invalid for main claims if query or test labels are used
+\EndFor
+\For{teacher $m$ in the medical VLP teacher set}
+    \State select $\delta_m^{\star}$ on $\mathcal{D}_{val}$ and compute $\hat p_i^{teacher(m)}$
+    \State promote teacher $m$ only if Eq.~\eqref{eq:mosaic_teacher_promotion_gate_final_topcs} is satisfied
+\EndFor
+\State \textbf{Output:} $\{\hat p_i^{MOSAIC}\}_{i\in\mathcal{D}_{q}}$, admitted targets, retrieval contexts, QPSC audit results, and teacher-promotion decisions
+\end{algorithmic}
+\end{algorithm}
+
+This workflow keeps the roles of the language model, multimodal encoder, semantic bank, foundation-model teachers, and risk head separate. LCAD supplies audited weak report targets. RASA learns report-anchored representations through section reconstruction and bidirectional modality-section contrastive alignment. The train-only bank supplies retrieval-grounded priors. QPSC evaluates reliable semantic-positive construction under leakage controls. VLP teachers test whether external foundation-model priors add utility beyond MOSAIC. The primary claim remains the LLM-augmented, report-anchored, train-only retrieval-calibrated MOSAIC pipeline unless a gated auxiliary module satisfies its prespecified promotion rule.
